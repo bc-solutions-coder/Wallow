@@ -151,14 +151,14 @@ jobs:
 
     steps:
       - name: Download unit test coverage
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: coverage-unit
           path: ./coverage/unit
         continue-on-error: true
 
       - name: Download integration test coverage
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: coverage-integration
           path: ./coverage/integration

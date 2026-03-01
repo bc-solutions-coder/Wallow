@@ -1,0 +1,30 @@
+<Project>
+  <!-- Import parent Directory.Build.props -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!-- Test project settings -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <!-- Auto-include xunit.runner.json if present -->
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)/xunit.runner.json')">
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Code coverage with Coverlet -->
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <!-- Coverage exclusions -->
+  <PropertyGroup>
+    <ExcludeFromCodeCoverage>false</ExcludeFromCodeCoverage>
+  </PropertyGroup>
+
+  <!-- Coverlet settings for CLI collection -->
+  <PropertyGroup>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+  </PropertyGroup>
+</Project>

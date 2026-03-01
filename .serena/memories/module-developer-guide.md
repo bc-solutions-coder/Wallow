@@ -1,0 +1,811 @@
+# Foundry Module Developer Guide
+
+This guide explains how to create, configure, and maintain modules in the Foundry modular monolith. All modules should follow these patterns for consistency.
+
+## Module Structure
+
+Every module follows Clean Architecture with exactly 4 layers:
+
+```
+src/Modules/{ModuleName}/
+├── Foundry.{ModuleName}.Domain/           # Domain layer
+│   ├── Identity/                          # Strongly-typed IDs
+│   ├── Entities/                          # Domain entities/aggregates
+│   ├── Enums/                            # Enumerations
+│   ├── Events/                           # Domain events
+│   ├── ValueObjects/                     # (optional) Value objects
+│   ├── Exceptions/                       # (optional) Custom exceptions
+│   └── Projections/                      # (event-sourced only)
+│
+├── Foundry.{ModuleName}.Application/      # Application layer
+│   ├── Commands/                         # CQRS command handlers
+│   ├── Queries/                          # CQRS query handlers
+│   ├── DTOs/                            # Data transfer objects
+│   ├── Interfaces/                       # Service contracts
+│   ├── EventHandlers/                    # Integration event consumers
+│   ├── Mappings/                         # (optional) AutoMapper profiles
+│   └── Validators/                       # (optional) FluentValidation
+│
+├── Foundry.{ModuleName}.Infrastructure/   # Infrastructure layer
+│   ├── Extensions/                       # DI registration
+│   ├── Persistence/                      # DbContext, repositories
+│   ├── Migrations/                       # EF Core migrations
+│   └── Services/                         # External service implementations
+│
+└── Foundry.{ModuleName}.Api/             # API layer
+    ├── Controllers/                      # Endpoint handlers
+    ├── Contracts/                        # Request/Response DTOs
+    └── Extensions/                       # Module registration
+```
+
+## Creating a New Module
+
+### Step 1: Create Project Structure
+
+Create 4 class library projects with naming convention `Foundry.{ModuleName}.{Layer}`:
+
+```bash
+# Create module directories
+mkdir -p src/Modules/{ModuleName}
+
+# Create projects (from solution root)
+dotnet new classlib -n Foundry.{ModuleName}.Domain -o src/Modules/{ModuleName}/Foundry.{ModuleName}.Domain
+dotnet new classlib -n Foundry.{ModuleName}.Application -o src/Modules/{ModuleName}/Foundry.{ModuleName}.Application
+dotnet new classlib -n Foundry.{ModuleName}.Infrastructure -o src/Modules/{ModuleName}/Foundry.{ModuleName}.Infrastructure
+dotnet new classlib -n Foundry.{ModuleName}.Api -o src/Modules/{ModuleName}/Foundry.{ModuleName}.Api
+
+# Add to solution
+dotnet sln add src/Modules/{ModuleName}/**/*.csproj
+```
+
+### Step 2: Configure Project References
+
+**Domain** (zero external dependencies):
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Kernel\Foundry.Shared.Kernel.csproj" />
+</ItemGroup>
+```
+
+**Application** (depends on Domain):
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\Foundry.{ModuleName}.Domain\Foundry.{ModuleName}.Domain.csproj" />
+  <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Kernel\Foundry.Shared.Kernel.csproj" />
+  <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Contracts\Foundry.Shared.Contracts.csproj" />
+</ItemGroup>
+```
+
+**Infrastructure** (implements Application interfaces):
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\Foundry.{ModuleName}.Application\Foundry.{ModuleName}.Application.csproj" />
+  <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Kernel\Foundry.Shared.Kernel.csproj" />
+  <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Contracts\Foundry.Shared.Contracts.csproj" />
+</ItemGroup>
+```
+
+**Api** (depends on Application and Infrastructure):
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\Foundry.{ModuleName}.Application\Foundry.{ModuleName}.Application.csproj" />
+  <ProjectReference Include="..\Foundry.{ModuleName}.Infrastructure\Foundry.{ModuleName}.Infrastructure.csproj" />
+</ItemGroup>
+```
+
+### Step 3: Create Domain Layer
+
+**Strongly-Typed ID** (Identity/{ModuleName}Id.cs):
+```csharp
+namespace Foundry.{ModuleName}.Domain.Identity;
+
+public readonly record struct {Entity}Id(Guid Value)
+{
+    public static {Entity}Id Empty => new(Guid.Empty);
+    public static {Entity}Id Create() => new(Guid.NewGuid());
+    public static {Entity}Id Create(Guid value) => new(value);
+    public override string ToString() => Value.ToString();
+}
+```
+
+**Domain Entity** (Entities/{Entity}.cs):
+```csharp
+namespace Foundry.{ModuleName}.Domain.Entities;
+
+public sealed class {Entity} : Entity<{Entity}Id>, ITenantScoped
+{
+    public TenantId TenantId { get; private set; }
+    // Properties...
+    
+    private {Entity}() { } // EF Core constructor
+    
+    public static {Entity} Create(TenantId tenantId, ...)
+    {
+        var entity = new {Entity}
+        {
+            Id = {Entity}Id.Create(),
+            TenantId = tenantId,
+            // Initialize...
+        };
+        entity.RaiseDomainEvent(new {Entity}CreatedDomainEvent(entity.Id, tenantId));
+        return entity;
+    }
+}
+```
+
+**Domain Event** (Events/{Entity}CreatedDomainEvent.cs):
+```csharp
+namespace Foundry.{ModuleName}.Domain.Events;
+
+public sealed record {Entity}CreatedDomainEvent({Entity}Id Id, TenantId TenantId) : DomainEvent;
+```
+
+### Step 4: Create Application Layer
+
+**Command** (Commands/Create{Entity}/Create{Entity}Command.cs):
+```csharp
+namespace Foundry.{ModuleName}.Application.Commands.Create{Entity};
+
+public sealed record Create{Entity}Command(...) : IRequest<Result<{Entity}Dto>>;
+```
+
+**Handler** (Commands/Create{Entity}/Create{Entity}Handler.cs):
+```csharp
+namespace Foundry.{ModuleName}.Application.Commands.Create{Entity};
+
+public sealed class Create{Entity}Handler(
+    I{Entity}Repository repository,
+    ITenantContext tenantContext,
+    IMessageBus bus)
+{
+    public async Task<Result<{Entity}Dto>> HandleAsync(
+        Create{Entity}Command command,
+        CancellationToken ct)
+    {
+        var entity = {Entity}.Create(tenantContext.TenantId, ...);
+        await repository.AddAsync(entity, ct);
+        await repository.SaveChangesAsync(ct);
+        
+        // Publish integration event
+        await bus.PublishAsync(new {Entity}CreatedEvent { ... }, ct);
+        
+        return Result.Success(entity.ToDto());
+    }
+}
+```
+
+**Repository Interface** (Interfaces/I{Entity}Repository.cs):
+```csharp
+namespace Foundry.{ModuleName}.Application.Interfaces;
+
+public interface I{Entity}Repository
+{
+    Task<{Entity}?> GetByIdAsync({Entity}Id id, CancellationToken ct = default);
+    Task AddAsync({Entity} entity, CancellationToken ct = default);
+    void Update({Entity} entity);
+    void Remove({Entity} entity);
+    Task SaveChangesAsync(CancellationToken ct = default);
+}
+```
+
+### Step 5: Create Infrastructure Layer
+
+**DbContext** (Persistence/{ModuleName}DbContext.cs):
+```csharp
+namespace Foundry.{ModuleName}.Infrastructure.Persistence;
+
+public sealed class {ModuleName}DbContext : DbContext
+{
+    private readonly ITenantContext _tenantContext;
+    
+    public {ModuleName}DbContext(
+        DbContextOptions<{ModuleName}DbContext> options,
+        ITenantContext tenantContext)
+        : base(options)
+    {
+        _tenantContext = tenantContext;
+    }
+    
+    public DbSet<{Entity}> {Entities} => Set<{Entity}>();
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // Use lowercase schema name (no underscores)
+        modelBuilder.HasDefaultSchema("{modulename}");
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof({ModuleName}DbContext).Assembly);
+        
+        // Apply tenant query filters for all ITenantScoped entities
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(ITenantScoped).IsAssignableFrom(entityType.ClrType))
+            {
+                var parameter = Expression.Parameter(entityType.ClrType, "e");
+                var tenantProperty = Expression.Property(parameter, nameof(ITenantScoped.TenantId));
+                var tenantValue = Expression.Constant(_tenantContext.TenantId);
+                var filter = Expression.Lambda(Expression.Equal(tenantProperty, tenantValue), parameter);
+                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(filter);
+            }
+        }
+    }
+}
+```
+
+**Entity Configuration** (Persistence/Configurations/{Entity}Configuration.cs):
+```csharp
+namespace Foundry.{ModuleName}.Infrastructure.Persistence.Configurations;
+
+public sealed class {Entity}Configuration : IEntityTypeConfiguration<{Entity}>
+{
+    public void Configure(EntityTypeBuilder<{Entity}> builder)
+    {
+        builder.ToTable("{entities}");  // lowercase, plural
+        builder.HasKey(x => x.Id);
+        
+        builder.Property(x => x.Id)
+            .HasConversion(new StronglyTypedIdConverter<{Entity}Id>())
+            .HasColumnName("id")
+            .ValueGeneratedNever();
+            
+        builder.Property(x => x.TenantId)
+            .HasConversion(new StronglyTypedIdConverter<TenantId>())
+            .HasColumnName("tenant_id")
+            .IsRequired();
+            
+        // Indexes
+        builder.HasIndex(x => x.TenantId);
+    }
+}
+```
+
+**Repository** (Persistence/Repositories/{Entity}Repository.cs):
+```csharp
+namespace Foundry.{ModuleName}.Infrastructure.Persistence.Repositories;
+
+public sealed class {Entity}Repository : I{Entity}Repository
+{
+    private readonly {ModuleName}DbContext _context;
+    
+    public {Entity}Repository({ModuleName}DbContext context)
+    {
+        _context = context;
+    }
+    
+    public async Task<{Entity}?> GetByIdAsync({Entity}Id id, CancellationToken ct = default)
+        => await _context.{Entities}.FindAsync([id], ct);
+    
+    public Task AddAsync({Entity} entity, CancellationToken ct = default)
+        => _context.{Entities}.AddAsync(entity, ct).AsTask();
+    
+    public void Update({Entity} entity) => _context.{Entities}.Update(entity);
+    public void Remove({Entity} entity) => _context.{Entities}.Remove(entity);
+    
+    public Task SaveChangesAsync(CancellationToken ct = default)
+        => _context.SaveChangesAsync(ct);
+}
+```
+
+**Infrastructure Extensions** (Extensions/InfrastructureExtensions.cs):
+```csharp
+namespace Foundry.{ModuleName}.Infrastructure.Extensions;
+
+public static class InfrastructureExtensions
+{
+    public static IServiceCollection Add{ModuleName}Infrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Add{ModuleName}Persistence(configuration);
+        return services;
+    }
+    
+    private static IServiceCollection Add{ModuleName}Persistence(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        
+        services.AddDbContext<{ModuleName}DbContext>((sp, options) =>
+        {
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "{modulename}");
+            });
+            options.AddInterceptors(sp.GetRequiredService<TenantSaveChangesInterceptor>());
+        });
+        
+        services.AddScoped<I{Entity}Repository, {Entity}Repository>();
+        
+        return services;
+    }
+}
+```
+
+### Step 6: Create API Layer
+
+**Module Extensions** (Extensions/{ModuleName}ModuleExtensions.cs):
+```csharp
+namespace Foundry.{ModuleName}.Api.Extensions;
+
+public static class {ModuleName}ModuleExtensions
+{
+    public static IServiceCollection Add{ModuleName}Module(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Optional: Register validators
+        // services.AddValidatorsFromAssembly(typeof({SomeValidator}).Assembly);
+        
+        services.Add{ModuleName}Infrastructure(configuration);
+        return services;
+    }
+    
+    public static async Task Use{ModuleName}ModuleAsync(this WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<{ModuleName}DbContext>>();
+        
+        try
+        {
+            var db = scope.ServiceProvider.GetRequiredService<{ModuleName}DbContext>();
+            await db.Database.MigrateAsync();
+            logger.LogInformation("{ModuleName} module initialized");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "{ModuleName} initialization failed. Ensure PostgreSQL is running.");
+        }
+    }
+}
+```
+
+**Controller** (Controllers/{Entity}Controller.cs):
+```csharp
+namespace Foundry.{ModuleName}.Api.Controllers;
+
+[ApiController]
+[Route("api/{modulename}/{entities}")]
+[Authorize]
+public class {Entity}Controller : ControllerBase
+{
+    private readonly IMessageBus _bus;
+    
+    public {Entity}Controller(IMessageBus bus) => _bus = bus;
+    
+    [HttpPost]
+    public async Task<ActionResult<{Entity}Response>> Create(
+        [FromBody] Create{Entity}Request request,
+        CancellationToken ct)
+    {
+        var command = new Create{Entity}Command(...);
+        var result = await _bus.InvokeAsync<Result<{Entity}Dto>>(command, ct);
+        
+        return result.IsSuccess
+            ? CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value.ToResponse())
+            : result.ToProblem();
+    }
+}
+```
+
+### Step 7: Register Module in Program.cs
+
+Add to `src/Foundry.Api/Program.cs`:
+
+```csharp
+// 1. Register Wolverine handler assembly (around line 100)
+opts.Discovery.IncludeAssembly(typeof(Foundry.{ModuleName}.Application.Commands.Create{Entity}.Create{Entity}Command).Assembly);
+
+// 2. Configure RabbitMQ event publishing (around line 160)
+opts.PublishMessage<{Entity}CreatedEvent>().ToRabbitExchange("{modulename}-events");
+
+// 3. Configure RabbitMQ consumer queue (around line 200)
+opts.ListenToRabbitQueue("{modulename}-inbox");
+
+// 4. Register module services (around line 260)
+builder.Services.Add{ModuleName}Module(builder.Configuration);
+
+// 5. Initialize module (after app.Build(), around line 340)
+await app.Use{ModuleName}ModuleAsync();
+```
+
+### Step 8: Create Migrations
+
+```bash
+dotnet ef migrations add InitialCreate \
+    --project src/Modules/{ModuleName}/Foundry.{ModuleName}.Infrastructure \
+    --startup-project src/Foundry.Api \
+    --context {ModuleName}DbContext
+```
+
+## Inter-Module Communication
+
+### Rule: NEVER reference other modules directly
+
+Modules communicate ONLY through:
+1. **Integration events** in `Shared.Contracts`
+2. **Shared interfaces** in `Shared.Contracts` (like IDataExporter, IDataEraser)
+
+### Publishing Integration Events
+
+1. Define event in `Shared.Contracts/{ModuleName}/Events/`:
+
+```csharp
+namespace Foundry.Shared.Contracts.{ModuleName}.Events;
+
+public sealed record {Entity}CreatedEvent : IntegrationEvent
+{
+    public required Guid Id { get; init; }
+    public required Guid TenantId { get; init; }
+    // Include all data consumers need
+}
+```
+
+2. Publish from handler:
+```csharp
+await bus.PublishAsync(new {Entity}CreatedEvent
+{
+    Id = entity.Id.Value,
+    TenantId = tenantContext.TenantId.Value,
+    // ...
+});
+```
+
+### Consuming Integration Events
+
+Create handler in Application layer:
+
+```csharp
+namespace Foundry.{ModuleName}.Application.EventHandlers;
+
+public static class SomeOtherModuleEventHandler
+{
+    public static async Task HandleAsync(
+        SomeEvent evt,
+        I{SomeService} service,
+        CancellationToken ct)
+    {
+        // Process event
+        await service.ProcessAsync(evt.Data, ct);
+    }
+}
+```
+
+## Testing
+
+### Test Project Structure
+
+```
+tests/Modules/{ModuleName}/
+├── {ModuleName}.Domain.Tests/        # Domain unit tests
+├── {ModuleName}.Application.Tests/   # Handler unit tests
+├── {ModuleName}.Infrastructure.Tests/ # Repository/service tests
+├── {ModuleName}.Architecture.Tests/  # Architecture validation
+└── Foundry.{ModuleName}.IntegrationTests/  # Full integration tests
+```
+
+### Unit Test Pattern
+
+```csharp
+public class Create{Entity}HandlerTests
+{
+    private readonly I{Entity}Repository _repository;
+    private readonly ITenantContext _tenantContext;
+    private readonly IMessageBus _bus;
+    private readonly Create{Entity}Handler _handler;
+    
+    public Create{Entity}HandlerTests()
+    {
+        _repository = Substitute.For<I{Entity}Repository>();
+        _tenantContext = Substitute.For<ITenantContext>();
+        _tenantContext.TenantId.Returns(new TenantId(Guid.NewGuid()));
+        _bus = Substitute.For<IMessageBus>();
+        _handler = new Create{Entity}Handler(_repository, _tenantContext, _bus);
+    }
+    
+    [Fact]
+    public async Task Handle_WithValidCommand_ShouldCreate{Entity}()
+    {
+        // Arrange
+        var command = new Create{Entity}Command(...);
+        
+        // Act
+        var result = await _handler.HandleAsync(command, CancellationToken.None);
+        
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        await _repository.Received(1).AddAsync(Arg.Any<{Entity}>(), Arg.Any<CancellationToken>());
+        await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+}
+```
+
+### Integration Test Pattern
+
+```csharp
+public class {Entity}IntegrationTests : IClassFixture<FoundryApiFactory>, IAsyncLifetime
+{
+    private readonly FoundryApiFactory _factory;
+    private readonly HttpClient _client;
+    
+    public {Entity}IntegrationTests(FoundryApiFactory factory)
+    {
+        _factory = factory;
+        _client = factory.CreateClient();
+    }
+    
+    public async Task InitializeAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<{ModuleName}DbContext>();
+        await context.Database.EnsureCreatedAsync();
+    }
+    
+    [Fact]
+    public async Task Create{Entity}_ShouldReturn201()
+    {
+        // Arrange
+        var request = new Create{Entity}Request { ... };
+        
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/{modulename}/{entities}", request);
+        
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+}
+```
+
+## Event-Sourced Modules (Marten)
+
+Event-sourced modules (Inventory, Sales, Scheduling) use **Marten** for event sourcing instead of EF Core. These modules follow a different pattern for registration and initialization.
+
+### Key Differences from EF Core Modules
+
+1. **No DbContext** - Uses Marten's IDocumentStore
+2. **No migrations** - Marten auto-creates/updates schema via `AddFoundryMarten()` in Program.cs
+3. **No Initialize method** - Marten self-initializes; no `InitializeXxxModuleAsync()` needed
+4. **Projections instead of entities** - Uses inline projections to build read models from events
+
+### Marten Module Registration Pattern
+
+**Module Extension (Infrastructure/Extensions/{Module}ModuleExtensions.cs):**
+
+```csharp
+namespace Foundry.{ModuleName}.Infrastructure.Extensions;
+
+public static class {ModuleName}ModuleExtensions
+{
+    public static IServiceCollection Add{ModuleName}Module(
+        this IServiceCollection services,
+        IConfiguration config)
+    {
+        // Configure Marten document types and projections for this module
+        // Base IDocumentStore is already registered by AddFoundryMarten()
+        services.ConfigureMarten(opts =>
+        {
+            // Register inline projections
+            opts.Projections.Add<{Entity}Projection>(ProjectionLifecycle.Inline);
+            
+            // Configure document schema
+            opts.Schema.For<{Entity}>()
+                .DatabaseSchemaName("{modulename}")
+                .UseNumericRevisions(true)
+                .Index(x => x.TenantId)
+                .Index(x => x.SomeProperty);
+        });
+        
+        // Register module services
+        services.AddScoped<I{Module}Service, {Module}Service>();
+        
+        // Register GDPR compliance services
+        services.AddTransient<IDataExporter, {Module}DataExporter>();
+        services.AddTransient<IDataEraser, {Module}DataEraser>();
+        
+        return services;
+    }
+    
+    // NO InitializeXxxModuleAsync() method - Marten auto-initializes
+    
+    // Optional: If module has Hangfire jobs
+    public static void Use{ModuleName}Module(this IApplicationBuilder app)
+    {
+        var recurringJobs = app.ApplicationServices.GetRequiredService<IRecurringJobManager>();
+        recurringJobs.AddOrUpdate<SomeJob>(
+            "job-id",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "*/5 * * * *");
+    }
+}
+```
+
+### Registration in FoundryModules.cs
+
+**AddFoundryModules:**
+```csharp
+// Shared Marten infrastructure (MUST come first)
+services.AddFoundryMarten(configuration);
+
+// Event-sourced modules
+services.AddInventoryModule(configuration);
+services.AddSalesModule(configuration);
+services.AddSchedulingModule(configuration);
+```
+
+**InitializeFoundryModulesAsync:**
+```csharp
+// NO initialization calls for Marten modules
+// They are auto-initialized by AddFoundryMarten()
+// Comment documents this:
+
+// Inventory, Sales, Scheduling use Marten event sourcing - no EF migrations needed
+```
+
+### Projection Pattern
+
+**Domain Layer (Domain/Projections/{Entity}.cs):**
+```csharp
+namespace Foundry.{ModuleName}.Domain.Projections;
+
+public sealed class {Entity}
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Status { get; set; } = string.Empty;
+    // Read model properties built from events
+}
+```
+
+**Infrastructure Layer (Infrastructure/Projections/{Entity}Projection.cs):**
+```csharp
+namespace Foundry.{ModuleName}.Infrastructure.Projections;
+
+public sealed class {Entity}Projection : SingleStreamProjection<{Entity}>
+{
+    public {Entity} Create({Entity}CreatedEvent evt)
+    {
+        return new {Entity}
+        {
+            Id = evt.AggregateId,
+            TenantId = evt.TenantId,
+            Status = "Active"
+        };
+    }
+    
+    public void Apply({Entity}UpdatedEvent evt, {Entity} entity)
+    {
+        entity.Status = evt.NewStatus;
+    }
+}
+```
+
+### Querying Documents
+
+Use `IDocumentSession` (scoped) or `IQuerySession` (readonly):
+
+```csharp
+public class {Module}Service
+{
+    private readonly IDocumentSession _session;
+    private readonly ITenantContext _tenantContext;
+    
+    public async Task<{Entity}?> GetByIdAsync(Guid id, CancellationToken ct)
+    {
+        return await _session.Query<{Entity}>()
+            .Where(x => x.Id == id && x.TenantId == _tenantContext.TenantId.Value)
+            .SingleOrDefaultAsync(ct);
+    }
+}
+```
+
+### Event Sourcing Pattern
+
+**Command Handler:**
+```csharp
+public static class Create{Entity}Handler
+{
+    public static async Task<Result<{Entity}Dto>> HandleAsync(
+        Create{Entity}Command command,
+        IDocumentSession session,
+        ITenantContext tenantContext,
+        CancellationToken ct)
+    {
+        var aggregateId = Guid.NewGuid();
+        var evt = new {Entity}CreatedEvent
+        {
+            AggregateId = aggregateId,
+            TenantId = tenantContext.TenantId.Value,
+            // Event data
+        };
+        
+        // Store event - Marten will apply projection automatically
+        session.Events.StartStream<{Entity}>(aggregateId, evt);
+        await session.SaveChangesAsync(ct);
+        
+        // Publish integration event via Wolverine
+        return Result.Success(new {Entity}Dto { Id = aggregateId });
+    }
+}
+```
+
+### Background Jobs in Marten Modules
+
+**INCONSISTENCY ALERT**: Marten modules use different patterns for Hangfire job registration:
+
+1. **Inventory**: Uses `UseInventoryModule(IApplicationBuilder)` - custom pattern
+2. **Sales**: No recurring jobs - no Use method
+3. **Scheduling**: Uses `RegisterSchedulingJobs(IRecurringJobManager)` - custom extension
+
+**Recommended pattern**: Implement `IRecurringJobRegistration` (consistent with EF Core modules):
+
+```csharp
+// Infrastructure/BackgroundJobs/{Module}RecurringJobRegistration.cs
+public class {Module}RecurringJobRegistration : IRecurringJobRegistration
+{
+    private readonly IRecurringJobManager _manager;
+    
+    public {Module}RecurringJobRegistration(IRecurringJobManager manager)
+    {
+        _manager = manager;
+    }
+    
+    public void RegisterJobs()
+    {
+        _manager.AddOrUpdate<SomeJob>(
+            "{modulename}-job-id",
+            job => job.ExecuteAsync(CancellationToken.None),
+            Cron.EveryMinute());
+    }
+}
+
+// In module extensions:
+services.AddSingleton<IRecurringJobRegistration, {Module}RecurringJobRegistration>();
+```
+
+### Marten Module Checklist
+
+- [ ] Base `IDocumentStore` registered via `AddFoundryMarten()` before module
+- [ ] Module uses `ConfigureMarten()` to add projections and schemas
+- [ ] Schema name matches module name (lowercase)
+- [ ] All projections registered with `ProjectionLifecycle.Inline`
+- [ ] Documents have `DatabaseSchemaName()` set
+- [ ] `UseNumericRevisions(true)` enabled for optimistic concurrency
+- [ ] Index on `TenantId` for all tenant-scoped documents
+- [ ] NO `InitializeXxxModuleAsync()` method (Marten auto-initializes)
+- [ ] NO EF Core migrations directory
+- [ ] Events stored via `session.Events.StartStream()` or `session.Events.Append()`
+- [ ] Integration events published AFTER `SaveChangesAsync()` succeeds
+- [ ] Background jobs use `IRecurringJobRegistration` pattern (not custom Use/Register methods)
+
+## Background Jobs
+
+Implement `IRecurringJobRegistration` from Shared.Kernel:
+
+```csharp
+public class {ModuleName}RecurringJobs : IRecurringJobRegistration
+{
+    public void RegisterJobs(IRecurringJobManager manager)
+    {
+        manager.AddOrUpdate<{SomeJob}>(
+            "{modulename}-job-id",
+            job => job.ExecuteAsync(CancellationToken.None),
+            Cron.Daily());
+    }
+}
+
+// Register in Infrastructure extensions
+services.AddSingleton<IRecurringJobRegistration, {ModuleName}RecurringJobs>();
+```
+
+## Common Patterns Checklist
+
+- [ ] Schema name is lowercase, no underscores
+- [ ] Use `StronglyTypedIdConverter<T>` for ID properties
+- [ ] All ITenantScoped entities have tenant query filters
+- [ ] Column names use snake_case (created_at, tenant_id)
+- [ ] Indexes on TenantId for all tenant-scoped tables
+- [ ] Domain events extend `DomainEvent` base class
+- [ ] Integration events extend `IntegrationEvent` base class
+- [ ] Integration events include TenantId property
+- [ ] Event handlers are static methods with `HandleAsync` name
+- [ ] No direct references to other module assemblies
+- [ ] Tests follow Arrange-Act-Assert pattern
+- [ ] Test names: `Method_Condition_ExpectedResult`

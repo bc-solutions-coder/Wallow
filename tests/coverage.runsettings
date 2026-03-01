@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[Foundry.*]*</Include>
+          <Exclude>[*]*.Migrations.*,[*]*Program,[*]*Startup,[*]*.Extensions.*Module*,[*]*AssemblyInfo,[*]*FoundryModules,[Foundry.Tests.Common]*,[*]System.Runtime.CompilerServices.*</Exclude>
+          <ExcludeByFile>**/Migrations/**/*.cs,**/obj/**/*.cs,**/*.g.cs,**/*.generated.cs</ExcludeByFile>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

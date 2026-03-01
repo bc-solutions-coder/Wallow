@@ -1,0 +1,211 @@
+using Asp.Versioning;
+using Foundry.Billing.Api.Contracts.Invoices;
+using Foundry.Billing.Api.Extensions;
+using Foundry.Billing.Application.Commands.AddLineItem;
+using Foundry.Billing.Application.Commands.CancelInvoice;
+using Foundry.Billing.Application.Commands.CreateInvoice;
+using Foundry.Billing.Application.Commands.IssueInvoice;
+using Foundry.Billing.Application.DTOs;
+using Foundry.Billing.Application.Queries.GetAllInvoices;
+using Foundry.Billing.Application.Queries.GetInvoiceById;
+using Foundry.Billing.Application.Queries.GetInvoicesByUserId;
+using Foundry.Shared.Kernel.Results;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine;
+
+namespace Foundry.Billing.Api.Controllers;
+
+[ApiController]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/billing/invoices")]
+[Authorize]
+[Tags("Invoices")]
+[Produces("application/json")]
+[Consumes("application/json")]
+public class InvoicesController : ControllerBase
+{
+    private readonly IMessageBus _bus;
+
+    public InvoicesController(IMessageBus bus)
+    {
+        _bus = bus;
+    }
+
+    /// <summary>
+    /// Get all invoices.
+    /// </summary>
+    [HttpGet]
+    [Authorize("InvoicesRead")]
+    [ProducesResponseType(typeof(IReadOnlyList<InvoiceResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<InvoiceDto>> result = await _bus.InvokeAsync<Result<IReadOnlyList<InvoiceDto>>>(
+            new GetAllInvoicesQuery(), cancellationToken);
+
+        return result.Map(invoices =>
+            (IReadOnlyList<InvoiceResponse>)invoices.Select(ToInvoiceResponse).ToList())
+            .ToActionResult();
+    }
+
+    /// <summary>
+    /// Get a specific invoice by ID.
+    /// </summary>
+    [HttpGet("{id:guid}")]
+    [Authorize("InvoicesRead")]
+    [ProducesResponseType(typeof(InvoiceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        Result<InvoiceDto> result = await _bus.InvokeAsync<Result<InvoiceDto>>(
+            new GetInvoiceByIdQuery(id), cancellationToken);
+
+        return result.Map(ToInvoiceResponse).ToActionResult();
+    }
+
+    /// <summary>
+    /// Get all invoices for a specific user.
+    /// </summary>
+    [HttpGet("user/{userId:guid}")]
+    [Authorize("InvoicesRead")]
+    [ProducesResponseType(typeof(IReadOnlyList<InvoiceResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetByUserId(Guid userId, CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<InvoiceDto>> result = await _bus.InvokeAsync<Result<IReadOnlyList<InvoiceDto>>>(
+            new GetInvoicesByUserIdQuery(userId), cancellationToken);
+
+        return result.Map(invoices =>
+            (IReadOnlyList<InvoiceResponse>)invoices.Select(ToInvoiceResponse).ToList())
+            .ToActionResult();
+    }
+
+    /// <summary>
+    /// Create a new invoice.
+    /// </summary>
+    [HttpPost]
+    [Authorize("InvoicesWrite")]
+    [ProducesResponseType(typeof(InvoiceResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Create(
+        [FromBody] CreateInvoiceRequest request,
+        CancellationToken cancellationToken)
+    {
+        Guid userId = GetCurrentUserId();
+
+        CreateInvoiceCommand command = new CreateInvoiceCommand(
+            userId,
+            request.InvoiceNumber,
+            request.Currency,
+            request.DueDate);
+
+        Result<InvoiceDto> result = await _bus.InvokeAsync<Result<InvoiceDto>>(command, cancellationToken);
+
+        return result.Map(ToInvoiceResponse)
+            .ToCreatedResult($"/api/billing/invoices/{result.Value?.Id}");
+    }
+
+    /// <summary>
+    /// Add a line item to an invoice.
+    /// </summary>
+    [HttpPost("{id:guid}/line-items")]
+    [Authorize("InvoicesWrite")]
+    [ProducesResponseType(typeof(InvoiceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> AddLineItem(
+        Guid id,
+        [FromBody] AddLineItemRequest request,
+        CancellationToken cancellationToken)
+    {
+        Guid userId = GetCurrentUserId();
+
+        AddLineItemCommand command = new AddLineItemCommand(
+            id,
+            request.Description,
+            request.UnitPrice,
+            request.Quantity,
+            userId);
+
+        Result<InvoiceDto> result = await _bus.InvokeAsync<Result<InvoiceDto>>(command, cancellationToken);
+
+        return result.Map(ToInvoiceResponse).ToActionResult();
+    }
+
+    /// <summary>
+    /// Issue an invoice to make it active.
+    /// </summary>
+    [HttpPost("{id:guid}/issue")]
+    [Authorize("InvoicesWrite")]
+    [ProducesResponseType(typeof(InvoiceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Issue(Guid id, CancellationToken cancellationToken)
+    {
+        Guid userId = GetCurrentUserId();
+
+        IssueInvoiceCommand command = new IssueInvoiceCommand(id, userId);
+
+        Result<InvoiceDto> result = await _bus.InvokeAsync<Result<InvoiceDto>>(command, cancellationToken);
+
+        return result.Map(ToInvoiceResponse).ToActionResult();
+    }
+
+    /// <summary>
+    /// Cancel an invoice.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize("InvoicesWrite")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken)
+    {
+        Guid userId = GetCurrentUserId();
+
+        CancelInvoiceCommand command = new CancelInvoiceCommand(id, userId);
+
+        Result result = await _bus.InvokeAsync<Result>(command, cancellationToken);
+
+        if (result.IsSuccess)
+        {
+            return NoContent();
+        }
+
+        return result.ToActionResult();
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        string? userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+
+        if (userIdClaim is not null && Guid.TryParse(userIdClaim, out Guid userId))
+        {
+            return userId;
+        }
+
+        return Guid.Empty;
+    }
+
+    private static InvoiceResponse ToInvoiceResponse(InvoiceDto dto) => new(
+        dto.Id,
+        dto.UserId,
+        dto.InvoiceNumber,
+        dto.Status,
+        dto.TotalAmount,
+        dto.Currency,
+        dto.DueDate,
+        dto.PaidAt,
+        dto.CreatedAt,
+        dto.UpdatedAt,
+        dto.LineItems.Select(ToLineItemResponse).ToList());
+
+    private static InvoiceLineItemResponse ToLineItemResponse(InvoiceLineItemDto dto) => new(
+        dto.Id,
+        dto.Description,
+        dto.UnitPrice,
+        dto.Currency,
+        dto.Quantity,
+        dto.LineTotal);
+}

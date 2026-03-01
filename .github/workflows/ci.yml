@@ -1,0 +1,206 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Check code formatting
+        run: dotnet format Foundry.sln --verify-no-changes --no-restore
+
+  unit-tests:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Run unit tests
+        run: dotnet test --no-build --configuration Release --filter "Category!=Integration" --verbosity normal --blame-hang-timeout 60s --collect "XPlat Code Coverage" --settings tests/coverage.runsettings --results-directory ./TestResults
+
+      - name: Upload unit test coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: ./TestResults/**/coverage.cobertura.xml
+          if-no-files-found: error
+          retention-days: 5
+
+  integration-tests:
+    needs: build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: foundry
+          POSTGRES_PASSWORD: foundry
+          POSTGRES_DB: foundry_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      rabbitmq:
+        image: rabbitmq:4.2-management-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      valkey:
+        image: valkey/valkey:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Run integration tests
+        run: dotnet test --no-build --configuration Release --filter "Category=Integration" --verbosity normal --blame-hang-timeout 5m --collect "XPlat Code Coverage" --settings tests/coverage.runsettings --results-directory ./TestResults
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=foundry_test;Username=foundry;Password=foundry"
+          RabbitMQ__Host: localhost
+          Redis__ConnectionString: "localhost:6379"
+
+      - name: Upload integration test coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: ./TestResults/**/coverage.cobertura.xml
+          if-no-files-found: error
+          retention-days: 5
+
+  merge-coverage:
+    needs: [unit-tests, integration-tests]
+    if: always() && (needs.unit-tests.result == 'success' || needs.integration-tests.result == 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download unit test coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-unit
+          path: ./coverage/unit
+        continue-on-error: true
+
+      - name: Download integration test coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-integration
+          path: ./coverage/integration
+        continue-on-error: true
+
+      - name: Check for coverage files
+        id: check-coverage
+        run: |
+          FILES=$(find ./coverage -name "coverage.cobertura.xml" -type f 2>/dev/null)
+          if [ -z "$FILES" ]; then
+            echo "::warning::No coverage artifacts were produced by test jobs. Coverage reporting skipped."
+            echo "has_coverage=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Found coverage files:"
+            echo "$FILES"
+            echo "has_coverage=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install ReportGenerator
+        if: steps.check-coverage.outputs.has_coverage == 'true'
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+      - name: Merge coverage reports
+        if: steps.check-coverage.outputs.has_coverage == 'true'
+        run: reportgenerator -reports:"./coverage/**/coverage.cobertura.xml" -targetdir:"./coverage/merged" -reporttypes:"Cobertura;HtmlSummary"
+
+      - name: Enforce coverage threshold
+        if: steps.check-coverage.outputs.has_coverage == 'true'
+        run: |
+          LINE_RATE=$(grep -oP 'line-rate="\K[^"]+' ./coverage/merged/Cobertura.xml | head -1)
+          PERCENT=$(awk "BEGIN {printf \"%.1f\", ${LINE_RATE:-0} * 100}")
+          echo "Line coverage: ${PERCENT}%"
+          MIN=90
+          if [ "$(awk "BEGIN {print (${LINE_RATE:-0} * 100 < $MIN)}")" = "1" ]; then
+            echo "::error::Coverage ${PERCENT}% is below minimum threshold of ${MIN}%"
+            exit 1
+          fi
+
+      - name: Upload merged coverage report
+        if: steps.check-coverage.outputs.has_coverage == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage/merged
+          retention-days: 30

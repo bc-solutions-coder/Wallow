@@ -1,0 +1,59 @@
+using Foundry.Billing.Application.Interfaces;
+using Foundry.Billing.Domain.Entities;
+using Foundry.Billing.Domain.Identity;
+using Microsoft.EntityFrameworkCore;
+
+namespace Foundry.Billing.Infrastructure.Persistence.Repositories;
+
+public sealed class PaymentRepository : IPaymentRepository
+{
+    private readonly BillingDbContext _context;
+
+    public PaymentRepository(BillingDbContext context)
+    {
+        _context = context;
+    }
+
+    public Task<Payment?> GetByIdAsync(PaymentId id, CancellationToken cancellationToken = default)
+    {
+        return _context.Payments.FindAsync([id], cancellationToken).AsTask();
+    }
+
+    public async Task<IReadOnlyList<Payment>> GetByInvoiceIdAsync(InvoiceId invoiceId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Payments
+            .Where(p => p.InvoiceId == invoiceId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Payment>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Payments
+            .Where(p => p.UserId == userId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Payment>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Payments
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public void Add(Payment payment)
+    {
+        _context.Payments.Add(payment);
+    }
+
+    public void Update(Payment payment)
+    {
+        _context.Payments.Update(payment);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+}

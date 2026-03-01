@@ -1,0 +1,12 @@
+using FluentValidation;
+
+namespace Foundry.Storage.Application.Commands.DeleteBucket;
+
+public sealed class DeleteBucketValidator : AbstractValidator<DeleteBucketCommand>
+{
+    public DeleteBucketValidator()
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty().WithMessage("Bucket name is required");
+    }
+}

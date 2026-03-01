@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: foundry-config
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  OpenTelemetry__ServiceName: "foundry"

@@ -1,0 +1,43 @@
+using Foundry.Configuration.Application.FeatureFlags.Contracts;
+using Foundry.Configuration.Domain.Entities;
+using Foundry.Configuration.Domain.Enums;
+using Foundry.Configuration.Domain.Events;
+using Foundry.Configuration.Domain.ValueObjects;
+using Foundry.Shared.Kernel.Results;
+using Microsoft.Extensions.Caching.Distributed;
+using Wolverine;
+
+namespace Foundry.Configuration.Application.FeatureFlags.Commands.CreateFeatureFlag;
+
+public sealed class CreateFeatureFlagHandler(
+    IFeatureFlagRepository repository,
+    IDistributedCache cache,
+    IMessageBus bus)
+{
+    public async Task<Result<Guid>> Handle(CreateFeatureFlagCommand cmd, CancellationToken ct)
+    {
+        FeatureFlag? existing = await repository.GetByKeyAsync(cmd.Key, ct);
+        if (existing is not null)
+        {
+            return Result.Failure<Guid>(Error.Conflict($"Flag with key '{cmd.Key}' already exists"));
+        }
+
+        FeatureFlag flag = cmd.FlagType switch
+        {
+            FlagType.Boolean => FeatureFlag.CreateBoolean(cmd.Key, cmd.Name, cmd.DefaultEnabled, cmd.Description),
+            FlagType.Percentage => FeatureFlag.CreatePercentage(cmd.Key, cmd.Name, cmd.RolloutPercentage ?? 0, cmd.Description),
+            FlagType.Variant => FeatureFlag.CreateVariant(
+                cmd.Key, cmd.Name,
+                cmd.Variants?.Select(v => new VariantWeight(v.Name, v.Weight)).ToList() ?? [],
+                cmd.DefaultVariant ?? "", cmd.Description),
+            _ => throw new ArgumentOutOfRangeException(nameof(cmd), cmd.FlagType, $"Unsupported flag type: {cmd.FlagType}")
+        };
+
+        await repository.AddAsync(flag, ct);
+
+        await cache.RemoveAsync($"ff:{flag.Key}", ct);
+        await bus.PublishAsync(new FeatureFlagCreatedEvent(flag.Id.Value, flag.Key, flag.FlagType));
+
+        return Result.Success(flag.Id.Value);
+    }
+}

@@ -1,0 +1,49 @@
+using Foundry.Billing.Application.DTOs;
+using Foundry.Billing.Application.Interfaces;
+using Foundry.Billing.Application.Mappings;
+using Foundry.Billing.Domain.Entities;
+using Foundry.Billing.Domain.Enums;
+using Foundry.Billing.Domain.Identity;
+using Foundry.Billing.Domain.ValueObjects;
+using Foundry.Shared.Kernel.Results;
+
+namespace Foundry.Billing.Application.Commands.ProcessPayment;
+
+public sealed class ProcessPaymentHandler(
+    IPaymentRepository paymentRepository,
+    IInvoiceRepository invoiceRepository)
+{
+    public async Task<Result<PaymentDto>> Handle(
+        ProcessPaymentCommand command,
+        CancellationToken cancellationToken)
+    {
+        InvoiceId invoiceId = InvoiceId.Create(command.InvoiceId);
+        Invoice? invoice = await invoiceRepository.GetByIdAsync(invoiceId, cancellationToken);
+
+        if (invoice is null)
+        {
+            return Result.Failure<PaymentDto>(
+                Error.NotFound("Invoice", command.InvoiceId));
+        }
+
+        if (!Enum.TryParse<PaymentMethod>(command.PaymentMethod, ignoreCase: true, out PaymentMethod method))
+        {
+            return Result.Failure<PaymentDto>(
+                Error.Validation($"Invalid payment method '{command.PaymentMethod}'. Valid values: {string.Join(", ", Enum.GetNames<PaymentMethod>())}"));
+        }
+
+        Money amount = Money.Create(command.Amount, command.Currency);
+        Payment payment = Payment.Create(
+            invoiceId,
+            command.UserId,
+            amount,
+            method,
+            command.UserId,
+            command.CustomFields);
+
+        paymentRepository.Add(payment);
+        await paymentRepository.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(payment.ToDto());
+    }
+}

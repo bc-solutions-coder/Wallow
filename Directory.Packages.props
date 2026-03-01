@@ -1,0 +1,177 @@
+<Project>
+  <!-- ===========================================
+       PACKAGE VERSIONS - UPDATE HERE FOR UPGRADES
+       When upgrading .NET, check for package updates:
+       - Run: dotnet outdated (requires dotnet-outdated-tool)
+       - Or check NuGet for latest versions
+       =========================================== -->
+  <PropertyGroup>
+    <!-- .NET Version-Coupled Packages -->
+    <!-- These should match the .NET version (e.g., 10.0.x for .NET 10) -->
+    <MicrosoftExtensionsVersion>10.0.2</MicrosoftExtensionsVersion>
+    <EfCoreVersion>10.0.2</EfCoreVersion>
+    <AspNetCoreVersion>10.0.2</AspNetCoreVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- ======================================
+         ASP.NET Core & Hosting
+         ====================================== -->
+    <PackageVersion Include="Asp.Versioning.Mvc" Version="8.1.1" />
+    <PackageVersion Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.1" />
+    <PackageVersion Include="Audit.EntityFramework.Core" Version="27.3.0" />
+    <PackageVersion Include="Elsa.Workflows.Core" Version="3.5.3" />
+    <PackageVersion Include="Elsa.Workflows.Management" Version="3.5.3" />
+    <PackageVersion Include="Elsa.Workflows.Runtime" Version="3.5.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.12.32" />
+    <!-- ======================================
+         Health Checks
+         ====================================== -->
+    <PackageVersion Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+    <PackageVersion Include="AspNetCore.HealthChecks.Rabbitmq" Version="9.0.0" />
+    <PackageVersion Include="AspNetCore.HealthChecks.Hangfire" Version="9.0.0" />
+    <!-- ======================================
+         Logging
+         ====================================== -->
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <!-- ======================================
+         OpenTelemetry
+         ====================================== -->
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.12.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.12.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.12.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.10.0-beta.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.12.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.12.0" />
+    <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
+    <!-- ======================================
+         Background Jobs (Hangfire)
+         ====================================== -->
+    <PackageVersion Include="Hangfire.Core" Version="1.8.22" />
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.22" />
+    <PackageVersion Include="Hangfire.PostgreSql" Version="1.20.13" />
+    <!-- ======================================
+         CQRS & Messaging (Wolverine)
+         ====================================== -->
+    <PackageVersion Include="WolverineFx" Version="5.14.0" />
+    <PackageVersion Include="WolverineFx.RabbitMQ" Version="5.14.0" />
+    <PackageVersion Include="WolverineFx.FluentValidation" Version="5.14.0" />
+    <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="5.14.0" />
+    <PackageVersion Include="WolverineFx.Postgresql" Version="5.14.0" />
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <!-- ======================================
+         Entity Framework Core
+         ====================================== -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EfCoreVersion)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EfCoreVersion)" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <!-- ======================================
+         Dapper (Micro-ORM)
+         ====================================== -->
+    <PackageVersion Include="Dapper" Version="2.1.66" />
+    <!-- ======================================
+         Messaging (handled by WolverineFx.RabbitMQ above)
+         ====================================== -->
+    <!-- ======================================
+         Authentication & Security
+         ====================================== -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="Keycloak.AuthServices.Authentication" Version="2.5.3" />
+    <PackageVersion Include="Keycloak.AuthServices.Sdk" Version="2.5.3" />
+    <!-- ======================================
+         Real-time (SignalR)
+         ====================================== -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.41" />
+    <PackageVersion Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
+    <!-- ======================================
+         Distributed Caching
+         ====================================== -->
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="$(MicrosoftExtensionsVersion)" />
+    <!-- ======================================
+         Email
+         ====================================== -->
+    <PackageVersion Include="MailKit" Version="4.14.1" />
+    <!-- ======================================
+         Cloud Storage (AWS S3)
+         ====================================== -->
+    <PackageVersion Include="AWSSDK.S3" Version="3.7.412.4" />
+    <!-- ======================================
+         Microsoft.Extensions.*
+         ====================================== -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="$(MicrosoftExtensionsVersion)" />
+    <!-- ======================================
+         HTML Processing
+         ====================================== -->
+    <PackageVersion Include="HtmlSanitizer" Version="9.0.892" />
+    <!-- ======================================
+         Workflow Engine (Elsa)
+         ====================================== -->
+    <PackageVersion Include="Elsa" Version="3.5.3" />
+    <PackageVersion Include="Elsa.EntityFrameworkCore.PostgreSql" Version="3.5.3" />
+    <PackageVersion Include="Elsa.Identity" Version="3.5.3" />
+    <PackageVersion Include="Elsa.Workflows.Api" Version="3.5.3" />
+    <PackageVersion Include="Elsa.Scheduling" Version="3.5.3" />
+    <PackageVersion Include="Elsa.Email" Version="3.5.3" />
+    <PackageVersion Include="Elsa.Http" Version="3.5.3" />
+    <!-- ======================================
+         Reverse Proxy (YARP)
+         ====================================== -->
+    <!-- ======================================
+         Testing
+         ====================================== -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="Bogus" Version="35.6.1" />
+    <PackageVersion Include="FluentAssertions" Version="8.8.0" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="Testcontainers" Version="4.10.0" />
+    <PackageVersion Include="Testcontainers.Keycloak" Version="4.10.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.10.0" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.10.0" />
+    <PackageVersion Include="Testcontainers.Redis" Version="4.10.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="$(EfCoreVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.1.0" />
+    <PackageVersion Include="WireMock.Net" Version="1.7.0" />
+    <!-- ======================================
+         Code Coverage
+         ====================================== -->
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <!-- ======================================
+         Architecture Testing
+         ====================================== -->
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
+    <!-- ======================================
+         Code Analysis
+         ====================================== -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.101" />
+    <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="2.0.187" />
+    <PackageVersion Include="Roslynator.Analyzers" Version="4.12.11" />
+    <!-- Pin all Roslyn packages to 5.0.0 to resolve version conflict between
+         Lamar/Wolverine (transitively pulls Microsoft.CodeAnalysis 4.14.0) and
+         NetAnalyzers (pulls Common/CSharp 5.0.0). Mixed versions cause TypeLoadException
+         in dotnet-ef migrations. CentralPackageTransitivePinningEnabled forces these. -->
+    <PackageVersion Include="Microsoft.CodeAnalysis" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Common" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Scripting" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Scripting.Common" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.VisualBasic" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
+  </ItemGroup>
+</Project>

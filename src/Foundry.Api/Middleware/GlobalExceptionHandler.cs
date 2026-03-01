@@ -1,0 +1,122 @@
+using FluentValidation;
+using Foundry.Shared.Kernel.Domain;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Foundry.Api.Middleware;
+
+/// <summary>
+/// Global exception handler that converts exceptions to Problem Details responses.
+/// Implements RFC 7807 for consistent error responses across the API.
+/// </summary>
+internal partial class GlobalExceptionHandler : IExceptionHandler
+{
+    private readonly ILogger<GlobalExceptionHandler> _logger;
+    private readonly IHostEnvironment _environment;
+
+    public GlobalExceptionHandler(
+        ILogger<GlobalExceptionHandler> logger,
+        IHostEnvironment environment)
+    {
+        _logger = logger;
+        _environment = environment;
+    }
+
+    public async ValueTask<bool> TryHandleAsync(
+        HttpContext httpContext,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        string traceId = System.Diagnostics.Activity.Current?.Id ?? httpContext.TraceIdentifier;
+
+        LogUnhandledException(exception, traceId, httpContext.Request.Path);
+
+        ProblemDetails problemDetails = CreateProblemDetails(exception, traceId);
+
+        httpContext.Response.StatusCode = problemDetails.Status ?? StatusCodes.Status500InternalServerError;
+
+        await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+
+        return true;
+    }
+
+    private ProblemDetails CreateProblemDetails(Exception exception, string traceId)
+    {
+        (int statusCode, string? title, string? type) = exception switch
+        {
+            EntityNotFoundException => (
+                StatusCodes.Status404NotFound,
+                "Resource Not Found",
+                "https://tools.ietf.org/html/rfc7231#section-6.5.4"),
+
+            BusinessRuleException => (
+                StatusCodes.Status422UnprocessableEntity,
+                "Business Rule Violation",
+                "https://tools.ietf.org/html/rfc4918#section-11.2"),
+
+            ValidationException => (
+                StatusCodes.Status400BadRequest,
+                "Validation Error",
+                "https://tools.ietf.org/html/rfc7231#section-6.5.1"),
+
+            UnauthorizedAccessException => (
+                StatusCodes.Status401Unauthorized,
+                "Unauthorized",
+                "https://tools.ietf.org/html/rfc7235#section-3.1"),
+
+            ArgumentException or ArgumentNullException => (
+                StatusCodes.Status400BadRequest,
+                "Bad Request",
+                "https://tools.ietf.org/html/rfc7231#section-6.5.1"),
+
+            _ => (
+                StatusCodes.Status500InternalServerError,
+                "Internal Server Error",
+                "https://tools.ietf.org/html/rfc7231#section-6.6.1")
+        };
+
+        ProblemDetails problemDetails = new ProblemDetails
+        {
+            Status = statusCode,
+            Title = title,
+            Type = type,
+            Instance = $"/errors/{traceId}",
+            Extensions =
+            {
+                ["traceId"] = traceId
+            }
+        };
+
+        // Add error code for domain exceptions
+        if (exception is DomainException domainException)
+        {
+            problemDetails.Extensions["code"] = domainException.Code;
+            problemDetails.Detail = exception.Message;
+        }
+        else if (exception is ValidationException validationException)
+        {
+            problemDetails.Detail = string.Join("; ", validationException.Errors.Select(e => e.ErrorMessage));
+            problemDetails.Extensions["errors"] = validationException.Errors
+                .Select(e => new { field = e.PropertyName, message = e.ErrorMessage })
+                .ToArray();
+        }
+        else if (_environment.IsDevelopment())
+        {
+            // Only expose exception details in development
+            problemDetails.Detail = exception.Message;
+            problemDetails.Extensions["exception"] = exception.ToString();
+        }
+        else
+        {
+            problemDetails.Detail = "An unexpected error occurred. Please try again later.";
+        }
+
+        return problemDetails;
+    }
+}
+
+internal partial class GlobalExceptionHandler
+{
+    [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception occurred. TraceId: {TraceId}, Path: {Path}")]
+    private partial void LogUnhandledException(Exception ex, string traceId, string path);
+}

@@ -1,22 +1,22 @@
-# Deploy to Dev - builds, pushes Docker image, and deploys via SSH
+# Publish - builds and pushes Docker image to GitHub Container Registry
 #
-# Required GitHub Secrets (configure in Settings > Environments > development):
-#   DEPLOY_SSH_KEY  - Private SSH key for the deploy user
-#   DEPLOY_HOST     - Hostname or IP of the dev server
-#   DEPLOY_USER     - SSH username on the dev server
+# Triggered on push to main (after PR merge) or manually.
+# Images are tagged with semver (via GitVersion), latest, and git SHA.
+# Pull with: docker pull ghcr.io/<owner>/foundry:<tag>
 
-name: Deploy to Dev
+name: Publish
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  publish:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -30,13 +30,13 @@ jobs:
       - name: Setup GitVersion
         uses: gittools/actions/gitversion/setup@v3.1.11
         with:
-          versionSpec: '6.x'
+          versionSpec: '6.0.x'
 
-      - name: Execute GitVersion
+      - name: Determine version
         id: gitversion
         uses: gittools/actions/gitversion/execute@v3.1.11
 
-      - name: Tag and push version
+      - name: Tag version
         run: |
           git tag "v${{ steps.gitversion.outputs.fullSemVer }}"
           git push origin "v${{ steps.gitversion.outputs.fullSemVer }}"
@@ -57,9 +57,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=dev
-            type=sha,prefix=dev-
-            type=raw,value=${{ steps.gitversion.outputs.fullSemVer }}
+            type=semver,pattern={{version}},value=v${{ steps.gitversion.outputs.fullSemVer }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.gitversion.outputs.fullSemVer }}
+            type=raw,value=latest
+            type=sha,prefix=
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -72,17 +73,3 @@ jobs:
             VERSION=${{ steps.gitversion.outputs.fullSemVer }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    environment: development
-
-    steps:
-      - name: Deploy to Dev Server
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: bash /opt/foundry/scripts/deploy.sh dev dev-${{ github.sha }}

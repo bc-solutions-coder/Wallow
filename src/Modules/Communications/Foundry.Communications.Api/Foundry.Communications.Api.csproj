@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Foundry.Communications.Api</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Foundry.Communications.Application\Foundry.Communications.Application.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Infrastructure\Foundry.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

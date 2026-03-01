@@ -1,0 +1,51 @@
+using FluentValidation.TestHelper;
+using Foundry.Storage.Application.Commands.DeleteBucket;
+
+namespace Foundry.Storage.Tests.Application;
+
+public class DeleteBucketValidatorTests
+{
+    private readonly DeleteBucketValidator _validator = new();
+
+    [Fact]
+    public void Should_Not_Have_Error_When_NameIsProvided()
+    {
+        DeleteBucketCommand command = new("my-bucket");
+
+        TestValidationResult<DeleteBucketCommand> result = _validator.TestValidate(command);
+
+        result.ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void Should_Have_Error_When_NameIsEmpty(string? name)
+    {
+        DeleteBucketCommand command = new(name!);
+
+        TestValidationResult<DeleteBucketCommand> result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(x => x.Name);
+    }
+
+    [Fact]
+    public void Should_Not_Have_Error_When_ForceIsFalse()
+    {
+        DeleteBucketCommand command = new("bucket", Force: false);
+
+        TestValidationResult<DeleteBucketCommand> result = _validator.TestValidate(command);
+
+        result.ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Fact]
+    public void Should_Not_Have_Error_When_ForceIsTrue()
+    {
+        DeleteBucketCommand command = new("bucket", Force: true);
+
+        TestValidationResult<DeleteBucketCommand> result = _validator.TestValidate(command);
+
+        result.ShouldNotHaveAnyValidationErrors();
+    }
+}

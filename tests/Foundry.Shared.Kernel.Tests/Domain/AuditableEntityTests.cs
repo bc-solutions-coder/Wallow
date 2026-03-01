@@ -1,0 +1,102 @@
+using Foundry.Shared.Kernel.Domain;
+using Foundry.Shared.Kernel.Identity;
+
+namespace Foundry.Shared.Kernel.Tests.Domain;
+
+public class AuditableEntityTests
+{
+    [Fact]
+    public void SetCreated_WithUserId_SetsCreatedAtAndCreatedBy()
+    {
+        Guid userId = Guid.NewGuid();
+        TestAuditableEntity entity = new(TestAuditableEntityId.New());
+
+        entity.SetCreated(userId);
+
+        entity.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        entity.CreatedBy.Should().Be(userId);
+    }
+
+    [Fact]
+    public void SetCreated_WithoutUserId_SetsCreatedAtAndNullCreatedBy()
+    {
+        TestAuditableEntity entity = new(TestAuditableEntityId.New());
+
+        entity.SetCreated();
+
+        entity.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        entity.CreatedBy.Should().BeNull();
+    }
+
+    [Fact]
+    public void SetUpdated_WithUserId_SetsUpdatedAtAndUpdatedBy()
+    {
+        Guid userId = Guid.NewGuid();
+        TestAuditableEntity entity = new(TestAuditableEntityId.New());
+
+        entity.SetUpdated(userId);
+
+        entity.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        entity.UpdatedBy.Should().Be(userId);
+    }
+
+    [Fact]
+    public void SetUpdated_WithoutUserId_SetsUpdatedAtAndNullUpdatedBy()
+    {
+        TestAuditableEntity entity = new(TestAuditableEntityId.New());
+
+        entity.SetUpdated();
+
+        entity.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        entity.UpdatedBy.Should().BeNull();
+    }
+
+    [Fact]
+    public void Constructor_WithId_SetsIdAndDefaultAuditFields()
+    {
+        TestAuditableEntityId id = TestAuditableEntityId.New();
+
+        TestAuditableEntity entity = new(id);
+
+        entity.Id.Should().Be(id);
+        entity.CreatedAt.Should().Be(default);
+        entity.UpdatedAt.Should().BeNull();
+        entity.CreatedBy.Should().BeNull();
+        entity.UpdatedBy.Should().BeNull();
+    }
+
+    [Fact]
+    public void SetUpdated_WithNull_SetsUpdatedAtButLeavesUpdatedByNull()
+    {
+        TestAuditableEntity entity = new(TestAuditableEntityId.New());
+
+        entity.SetUpdated(null);
+
+        entity.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        entity.UpdatedBy.Should().BeNull();
+    }
+
+    [Fact]
+    public void ParameterlessCtor_InitializesWithDefaultValues()
+    {
+        TestAuditableEntity entity = new();
+
+        entity.Id.Should().Be(default(TestAuditableEntityId));
+        entity.CreatedAt.Should().Be(default);
+        entity.UpdatedAt.Should().BeNull();
+        entity.CreatedBy.Should().BeNull();
+        entity.UpdatedBy.Should().BeNull();
+    }
+
+    private sealed class TestAuditableEntity : AuditableEntity<TestAuditableEntityId>
+    {
+        public TestAuditableEntity() { }
+        public TestAuditableEntity(TestAuditableEntityId id) : base(id) { }
+    }
+
+    private readonly record struct TestAuditableEntityId(Guid Value) : IStronglyTypedId<TestAuditableEntityId>
+    {
+        public static TestAuditableEntityId Create(Guid value) => new(value);
+        public static TestAuditableEntityId New() => new(Guid.NewGuid());
+    }
+}

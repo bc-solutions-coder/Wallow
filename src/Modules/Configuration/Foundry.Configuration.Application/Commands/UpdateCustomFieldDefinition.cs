@@ -1,0 +1,78 @@
+using Foundry.Configuration.Application.Contracts;
+using Foundry.Configuration.Application.Contracts.DTOs;
+using Foundry.Configuration.Domain.Entities;
+using Foundry.Configuration.Domain.Exceptions;
+using Foundry.Configuration.Domain.Identity;
+using Foundry.Shared.Kernel.CustomFields;
+
+namespace Foundry.Configuration.Application.Commands;
+
+public sealed record UpdateCustomFieldDefinition(
+    Guid Id,
+    string? DisplayName = null,
+    string? Description = null,
+    bool? IsRequired = null,
+    int? DisplayOrder = null,
+    FieldValidationRules? ValidationRules = null,
+    IReadOnlyList<CustomFieldOption>? Options = null);
+
+public sealed class UpdateCustomFieldDefinitionHandler
+{
+    private readonly ICustomFieldDefinitionRepository _repository;
+
+    public UpdateCustomFieldDefinitionHandler(ICustomFieldDefinitionRepository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<CustomFieldDefinitionDto> Handle(
+        UpdateCustomFieldDefinition command,
+        CancellationToken cancellationToken)
+    {
+        CustomFieldDefinition? definition = await _repository.GetByIdAsync(
+            CustomFieldDefinitionId.Create(command.Id),
+            cancellationToken);
+
+        if (definition == null)
+        {
+            throw new CustomFieldException($"Custom field definition with ID '{command.Id}' not found");
+        }
+
+        Guid userId = Guid.Empty;
+
+        if (command.DisplayName != null)
+        {
+            definition.UpdateDisplayName(command.DisplayName, userId);
+        }
+
+        if (command.Description != null)
+        {
+            definition.UpdateDescription(command.Description, userId);
+        }
+
+        if (command.IsRequired.HasValue)
+        {
+            definition.SetRequired(command.IsRequired.Value, userId);
+        }
+
+        if (command.DisplayOrder.HasValue)
+        {
+            definition.SetDisplayOrder(command.DisplayOrder.Value, userId);
+        }
+
+        if (command.ValidationRules != null)
+        {
+            definition.SetValidationRules(command.ValidationRules, userId);
+        }
+
+        if (command.Options != null)
+        {
+            definition.SetOptions(command.Options, userId);
+        }
+
+        await _repository.UpdateAsync(definition, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+
+        return definition.ToDto();
+    }
+}

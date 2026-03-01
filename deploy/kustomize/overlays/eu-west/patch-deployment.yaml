@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foundry
+  annotations:
+    foundry.io/region: eu-west
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: foundry
+          envFrom:
+            - configMapRef:
+                name: foundry-region-config
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 1000m
+            limits:
+              memory: 1Gi
+              cpu: 2000m

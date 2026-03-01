@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foundry
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: foundry
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 1000m
+            limits:
+              memory: 1Gi
+              cpu: 2000m

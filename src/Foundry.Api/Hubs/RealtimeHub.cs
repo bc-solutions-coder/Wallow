@@ -1,0 +1,126 @@
+using System.Security.Claims;
+using Foundry.Shared.Contracts.Realtime;
+using Foundry.Shared.Kernel.MultiTenancy;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+
+namespace Foundry.Api.Hubs;
+
+[Authorize]
+internal sealed partial class RealtimeHub(
+    IPresenceService presenceService,
+    IRealtimeDispatcher dispatcher,
+    ITenantContext tenantContext,
+    ILogger<RealtimeHub> logger) : Hub
+{
+    public override async Task OnConnectedAsync()
+    {
+        string? userId = GetUserId();
+        if (userId is null)
+        {
+            Context.Abort();
+            return;
+        }
+
+        await presenceService.TrackConnectionAsync(userId, Context.ConnectionId);
+        LogUserConnected(userId, Context.ConnectionId);
+
+        RealtimeEnvelope envelope = RealtimeEnvelope.Create("Presence", "UserOnline", new { UserId = userId });
+        await dispatcher.SendToAllAsync(envelope);
+        await base.OnConnectedAsync();
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        string? userId = await presenceService.GetUserIdByConnectionAsync(Context.ConnectionId);
+        await presenceService.RemoveConnectionAsync(Context.ConnectionId);
+
+        if (userId is not null)
+        {
+            bool stillOnline = await presenceService.IsUserOnlineAsync(userId);
+            if (!stillOnline)
+            {
+                RealtimeEnvelope envelope = RealtimeEnvelope.Create("Presence", "UserOffline", new { UserId = userId });
+                await dispatcher.SendToAllAsync(envelope);
+            }
+        }
+
+        LogConnectionDisconnected(Context.ConnectionId);
+        await base.OnDisconnectedAsync(exception);
+    }
+
+    public async Task JoinGroup(string groupId)
+    {
+        ValidateTenantGroup(groupId);
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupId);
+        LogConnectionJoinedGroup(Context.ConnectionId, groupId);
+    }
+
+    public async Task LeaveGroup(string groupId)
+    {
+        ValidateTenantGroup(groupId);
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupId);
+    }
+
+    public async Task UpdatePageContext(string pageContext)
+    {
+        string? userId = GetUserId();
+        if (userId is null)
+        {
+            return;
+        }
+
+        await presenceService.SetPageContextAsync(Context.ConnectionId, pageContext);
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"page:{pageContext}");
+
+        IReadOnlyList<UserPresence> viewers = await presenceService.GetUsersOnPageAsync(pageContext);
+        RealtimeEnvelope envelope = RealtimeEnvelope.Create("Presence", "PageViewersUpdated", new
+        {
+            PageContext = pageContext,
+            Viewers = viewers
+        });
+        await Clients.Group($"page:{pageContext}").SendAsync("ReceivePresence", envelope);
+    }
+
+    private void ValidateTenantGroup(string groupId)
+    {
+        if (!groupId.StartsWith("tenant:", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        ReadOnlySpan<char> afterPrefix = groupId.AsSpan(7);
+        int nextColon = afterPrefix.IndexOf(':');
+        ReadOnlySpan<char> tenantSegment = nextColon >= 0 ? afterPrefix[..nextColon] : afterPrefix;
+
+        if (!Guid.TryParse(tenantSegment, out Guid groupTenantId))
+        {
+            throw new HubException("Invalid tenant group format.");
+        }
+
+        if (groupTenantId != tenantContext.TenantId.Value)
+        {
+            LogCrossTenantJoinRejected(Context.ConnectionId, groupId, tenantContext.TenantId.Value);
+            throw new HubException("Access denied: tenant mismatch.");
+        }
+    }
+
+    private string? GetUserId() =>
+        Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? Context.User?.FindFirst("sub")?.Value;
+}
+
+internal sealed partial class RealtimeHub
+{
+    [LoggerMessage(Level = LogLevel.Information, Message = "User {UserId} connected with {ConnectionId}")]
+    private partial void LogUserConnected(string userId, string connectionId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Connection {ConnectionId} disconnected")]
+    private partial void LogConnectionDisconnected(string connectionId);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Connection {ConnectionId} joined group {GroupId}")]
+    private partial void LogConnectionJoinedGroup(string connectionId, string groupId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Rejected cross-tenant group join: Connection {ConnectionId} attempted to join {GroupId} but belongs to tenant {TenantId}")]
+    private partial void LogCrossTenantJoinRejected(string connectionId, string groupId, Guid tenantId);
+}

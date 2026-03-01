@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Foundry.Identity.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Foundry.Identity.Application\Foundry.Identity.Application.csproj" />
+    <ProjectReference Include="..\Foundry.Identity.Infrastructure\Foundry.Identity.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

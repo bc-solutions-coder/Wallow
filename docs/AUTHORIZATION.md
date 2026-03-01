@@ -1,0 +1,406 @@
+# Authorization Guide
+
+Foundry uses role-based access control (RBAC) with permission expansion. Keycloak manages authentication and assigns roles; the API expands roles into granular permissions at request time.
+
+---
+
+## How It Works
+
+```
+JWT with role claims
+        │
+        ▼
+┌─────────────────────────────┐
+│ PermissionExpansionMiddleware │
+│ Reads roles from token       │
+│ Expands to permission claims │
+└─────────────┬───────────────┘
+              ▼
+┌─────────────────────────────┐
+│ [HasPermission] attribute   │
+│ Checks permission claims    │
+└─────────────────────────────┘
+```
+
+1. User authenticates with Keycloak and receives a JWT containing roles (e.g., `admin`, `manager`, `user`)
+2. `PermissionExpansionMiddleware` reads the roles and adds permission claims to the request
+3. Controller actions decorated with `[HasPermission]` check for specific permissions
+
+---
+
+## Adding Permissions to Routes
+
+### Step 1: Choose or Add a Permission
+
+Permissions are defined in `PermissionType.cs`:
+
+```
+src/Modules/Identity/Foundry.Identity.Domain/Enums/PermissionType.cs
+```
+
+```csharp
+public enum PermissionType
+{
+    // Group by domain, use ranges for organization
+    UsersRead = 100,
+    UsersCreate = 101,
+    UsersUpdate = 102,
+    UsersDelete = 103,
+
+    // Billing permissions
+    BillingRead = 500,
+    BillingManage = 501,
+    InvoicesRead = 502,
+    InvoicesWrite = 503,
+    // ...
+}
+```
+
+**Naming convention**: `{Domain}{Action}` — e.g., `BillingRead`, `InvoicesWrite`, `WebhooksManage`.
+
+### Step 2: Map Permission to Roles
+
+Edit `RolePermissionMapping.cs`:
+
+```
+src/Modules/Identity/Foundry.Identity.Infrastructure/Authorization/RolePermissionMapping.cs
+```
+
+```csharp
+public static class RolePermissionMapping
+{
+    private static readonly Dictionary<string, PermissionType[]> RolePermissions = new()
+    {
+        ["admin"] = Enum.GetValues<PermissionType>(), // Admin gets everything
+
+        ["manager"] = new[]
+        {
+            PermissionType.UsersRead,
+            PermissionType.BillingRead,
+            PermissionType.InvoicesRead,
+            PermissionType.InvoicesWrite,
+            // ...
+        },
+
+        ["user"] = new[]
+        {
+            PermissionType.BillingRead,  // Users can read billing
+            // ...
+        }
+    };
+}
+```
+
+### Step 3: Apply to Controller or Action
+
+Add the `[HasPermission]` attribute:
+
+```csharp
+using Foundry.Identity.Api.Authorization;
+using Foundry.Identity.Domain.Enums;
+
+[ApiController]
+[Route("api/billing/invoices")]
+[Authorize]  // Requires authentication
+public class InvoicesController : ControllerBase
+{
+    [HttpGet]
+    [HasPermission(PermissionType.InvoicesRead)]  // Requires permission
+    public async Task<IActionResult> GetAll()
+    {
+        // ...
+    }
+
+    [HttpPost]
+    [HasPermission(PermissionType.InvoicesWrite)]
+    public async Task<IActionResult> Create(CreateInvoiceRequest request)
+    {
+        // ...
+    }
+}
+```
+
+You can apply `[HasPermission]` at the controller level (all actions) or individual action level.
+
+### Step 4: Add Project Reference (if needed)
+
+If your module doesn't reference the Identity module, add the reference to access `HasPermissionAttribute`:
+
+```xml
+<!-- In your Module.Api.csproj -->
+<ProjectReference Include="..\..\Identity\Foundry.Identity.Api\Foundry.Identity.Api.csproj" />
+```
+
+Or reference just the Domain project if you only need `PermissionType`:
+
+```xml
+<ProjectReference Include="..\..\Identity\Foundry.Identity.Domain\Foundry.Identity.Domain.csproj" />
+```
+
+---
+
+## Adding New Roles
+
+Roles are managed in Keycloak. To add a new role:
+
+### Step 1: Add Role in Keycloak
+
+1. Open Keycloak admin console (`http://localhost:8080`)
+2. Select the `foundry` realm
+3. Go to **Realm roles** → **Create role**
+4. Enter the role name (lowercase, e.g., `billing-admin`)
+
+For persistence across environments, update the realm export:
+
+```
+docker/keycloak/realm-export.json
+```
+
+### Step 2: Map Permissions to the Role
+
+Add the role to `RolePermissionMapping.cs`:
+
+```csharp
+private static readonly Dictionary<string, PermissionType[]> RolePermissions = new()
+{
+    ["admin"] = Enum.GetValues<PermissionType>(),
+
+    ["billing-admin"] = new[]  // New role
+    {
+        PermissionType.BillingRead,
+        PermissionType.BillingManage,
+        PermissionType.InvoicesRead,
+        PermissionType.InvoicesWrite,
+        PermissionType.PaymentsRead,
+        PermissionType.PaymentsWrite,
+        PermissionType.SubscriptionsRead,
+        PermissionType.SubscriptionsWrite,
+    },
+
+    ["manager"] = new[] { /* ... */ },
+    ["user"] = new[] { /* ... */ },
+};
+```
+
+### Step 3: Assign Role to Users
+
+In Keycloak:
+1. Go to **Users** → select a user
+2. Go to **Role mapping** tab
+3. Click **Assign role** and select the role
+
+Or via API using `KeycloakAdminService`.
+
+---
+
+## Service Account Permissions
+
+Service accounts (machine-to-machine) use OAuth2 scopes instead of roles. The middleware maps scopes to permissions.
+
+### Adding a New Scope Mapping
+
+Edit `PermissionExpansionMiddleware.cs`:
+
+```csharp
+private static PermissionType? MapScopeToPermission(string scope)
+{
+    return scope switch
+    {
+        "billing.read" => PermissionType.BillingRead,
+        "billing.manage" => PermissionType.BillingManage,
+        "invoices.read" => PermissionType.InvoicesRead,
+        "invoices.write" => PermissionType.InvoicesWrite,
+        // ...
+        _ => null
+    };
+}
+```
+
+**Scope naming convention**: `{domain}.{action}` — e.g., `invoices.read`, `billing.manage`.
+
+---
+
+## Quick Reference
+
+### Files to Edit
+
+| Task | File |
+|------|------|
+| Add permission | `Identity.Domain/Enums/PermissionType.cs` |
+| Map permission to role | `Identity.Infrastructure/Authorization/RolePermissionMapping.cs` |
+| Map scope to permission | `Identity.Infrastructure/Authorization/PermissionExpansionMiddleware.cs` |
+| Apply to route | Your controller with `[HasPermission(...)]` |
+
+### Existing Roles
+
+| Role | Description |
+|------|-------------|
+| `admin` | All permissions |
+| `manager` | Team management, projects, tasks, billing read, API keys |
+| `user` | Basic access — read tasks/projects, create tasks |
+
+### Permission Ranges
+
+| Range | Domain |
+|-------|--------|
+| 100-199 | Users |
+| 200-299 | Roles |
+| 300-399 | Tasks (reserved) |
+| 400-499 | Projects (reserved) |
+| 500-599 | Billing (BillingRead, BillingManage, Invoices*, Payments*, Subscriptions*) |
+| 600-699 | Organizations |
+| 700-749 | API Keys |
+| 750-799 | Notifications |
+| 800-809 | Catalog (reserved) |
+| 810-819 | Orders (reserved) |
+| 850-859 | Webhooks |
+| 860-899 | SSO / SCIM |
+| 900+ | Admin |
+
+> **Note:** Some permission ranges (Tasks, Projects, Catalog, Orders) are reserved in the enum for future use or extension modules. The current active modules are: Identity, Billing, Communications, Storage, and Configuration.
+
+---
+
+## Multi-Tenancy Authorization
+
+Foundry uses Keycloak Organizations for multi-tenancy. The `TenantResolutionMiddleware` extracts the tenant ID from the JWT and populates `ITenantContext`.
+
+### How Tenant Resolution Works
+
+```
+JWT with organization claim
+        │
+        ▼
+┌─────────────────────────────────────┐
+│ TenantResolutionMiddleware          │
+│ - Parses organization claim (JSON)  │
+│ - Sets ITenantContext.TenantId      │
+└─────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────┐
+│ EF Core Global Query Filters        │
+│ - Automatically filter by TenantId  │
+└─────────────────────────────────────┘
+```
+
+### Keycloak Organization Claim Format
+
+Keycloak 26+ uses a JSON format for the `organization` claim:
+
+```json
+{
+  "550e8400-e29b-41d4-a716-446655440000": {
+    "name": "Acme Corp"
+  }
+}
+```
+
+The middleware parses the GUID from the property name (not a value) and extracts the organization name from the nested object.
+
+### Admin Tenant Override
+
+Users with the `admin` role can switch tenant context using the `X-Tenant-Id` header:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+     -H "X-Tenant-Id: 550e8400-e29b-41d4-a716-446655440000" \
+     http://localhost:5000/api/billing/invoices
+```
+
+This allows admins to view data across tenants for support scenarios.
+
+### Accessing Tenant Context in Code
+
+Inject `ITenantContext` to access the current tenant:
+
+```csharp
+public class InvoiceService
+{
+    private readonly ITenantContext _tenantContext;
+
+    public InvoiceService(ITenantContext tenantContext)
+    {
+        _tenantContext = tenantContext;
+    }
+
+    public async Task<List<Invoice>> GetInvoicesAsync()
+    {
+        // TenantId is already set by middleware
+        var tenantId = _tenantContext.TenantId;
+        // EF Core global query filters handle filtering automatically
+    }
+}
+```
+
+---
+
+## Testing Permissions
+
+### Unit Test Example
+
+```csharp
+[Fact]
+public async Task GetUsers_RequiresUsersRead_Returns403WhenMissing()
+{
+    // Arrange - user without UsersRead permission
+    var client = _factory.CreateClientWithRole("user");
+
+    // Act
+    var response = await client.GetAsync("/api/identity/users");
+
+    // Assert
+    response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+}
+```
+
+### Manual Testing
+
+1. Get a token from Keycloak with the desired role
+2. Call the API with the token
+3. Verify 200 (allowed) or 403 (forbidden)
+
+```bash
+# Get token for user with 'manager' role
+TOKEN=$(curl -s -X POST "http://localhost:8080/realms/foundry/protocol/openid-connect/token" \
+  -d "grant_type=password" \
+  -d "client_id=foundry-spa" \
+  -d "username=manager@example.com" \
+  -d "password=password" | jq -r '.access_token')
+
+# Call protected endpoint
+curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/api/identity/users
+```
+
+---
+
+## Middleware Pipeline Order
+
+The authorization middleware must be registered in the correct order in `Program.cs`:
+
+```
+1. UseAuthentication()         - Keycloak JWT validation
+2. TenantResolutionMiddleware  - Parses organization claim → ITenantContext
+3. PermissionExpansionMiddleware - Expands roles → permission claims
+4. UseAuthorization()          - Enforces [HasPermission] attributes
+```
+
+**Warning**: Reordering these middlewares will break authorization. For example, if `PermissionExpansionMiddleware` runs before authentication, there will be no user claims to expand.
+
+---
+
+## Troubleshooting
+
+**403 Forbidden but user has the role**
+- Check `RolePermissionMapping` includes the permission for that role
+- Verify the role name matches exactly (case-sensitive)
+- Check the JWT contains the role claim (decode at jwt.io)
+
+**Permission not being checked**
+- Ensure `[Authorize]` is on the controller (authentication required first)
+- Verify `[HasPermission]` attribute is applied
+- Check project references include `Foundry.Identity.Api`
+
+**Service account getting 403**
+- Verify the scope is in the token
+- Check `MapScopeToPermission` includes the mapping

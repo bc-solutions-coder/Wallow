@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- TargetFramework, Nullable, etc. inherited from Directory.Build.props -->
+  <!-- Package versions managed in Directory.Packages.props -->
+
+  <PropertyGroup>
+    <RootNamespace>Foundry.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- API Documentation -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Scalar.AspNetCore" />
+
+    <!-- Health Checks -->
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
+    <PackageReference Include="AspNetCore.HealthChecks.Rabbitmq" />
+    <PackageReference Include="AspNetCore.HealthChecks.Hangfire" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" />
+
+    <!-- Real-time (SignalR) -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
+    <PackageReference Include="StackExchange.Redis" />
+
+    <!-- Distributed Caching -->
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+
+    <!-- Logging -->
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+
+    <!-- OpenTelemetry -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
+
+    <!-- CQRS & Messaging -->
+    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.RabbitMQ" />
+    <PackageReference Include="WolverineFx.FluentValidation" />
+    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
+    <PackageReference Include="WolverineFx.Postgresql" />
+
+    <!-- Background Jobs -->
+    <PackageReference Include="Hangfire.AspNetCore" />
+    <PackageReference Include="Hangfire.PostgreSql" />
+
+    <!-- Reverse Proxy -->
+
+    <!-- Workflow Engine -->
+    <PackageReference Include="Elsa.Workflows.Api" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Module Api projects -->
+    <ProjectReference Include="..\Modules\Billing\Foundry.Billing.Api\Foundry.Billing.Api.csproj" />
+    <ProjectReference Include="..\Modules\Communications\Foundry.Communications.Api\Foundry.Communications.Api.csproj" />
+    <ProjectReference Include="..\Modules\Configuration\Foundry.Configuration.Api\Foundry.Configuration.Api.csproj" />
+    <ProjectReference Include="..\Modules\Identity\Foundry.Identity.Api\Foundry.Identity.Api.csproj" />
+    <ProjectReference Include="..\Modules\Storage\Foundry.Storage.Api\Foundry.Storage.Api.csproj" />
+
+    <!-- Module Infrastructure projects -->
+    <ProjectReference Include="..\Modules\Billing\Foundry.Billing.Infrastructure\Foundry.Billing.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Communications\Foundry.Communications.Infrastructure\Foundry.Communications.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Configuration\Foundry.Configuration.Infrastructure\Foundry.Configuration.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Identity\Foundry.Identity.Infrastructure\Foundry.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Storage\Foundry.Storage.Infrastructure\Foundry.Storage.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Foundry.Shared.Kernel\Foundry.Shared.Kernel.csproj" />
+    <ProjectReference Include="..\Shared\Foundry.Shared.Contracts\Foundry.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\Shared\Foundry.Shared.Infrastructure\Foundry.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

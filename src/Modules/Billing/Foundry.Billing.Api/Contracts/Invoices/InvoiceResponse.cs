@@ -1,0 +1,22 @@
+namespace Foundry.Billing.Api.Contracts.Invoices;
+
+public sealed record InvoiceResponse(
+    Guid Id,
+    Guid UserId,
+    string InvoiceNumber,
+    string Status,
+    decimal TotalAmount,
+    string Currency,
+    DateTime? DueDate,
+    DateTime? PaidAt,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt,
+    IReadOnlyList<InvoiceLineItemResponse> LineItems);
+
+public sealed record InvoiceLineItemResponse(
+    Guid Id,
+    string Description,
+    decimal UnitPrice,
+    string Currency,
+    int Quantity,
+    decimal LineTotal);

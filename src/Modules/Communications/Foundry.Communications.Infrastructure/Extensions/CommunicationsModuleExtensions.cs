@@ -1,0 +1,96 @@
+using Foundry.Communications.Application.Announcements.Interfaces;
+using Foundry.Communications.Application.Channels.Email.Interfaces;
+using Foundry.Communications.Application.Channels.InApp.Interfaces;
+using Foundry.Communications.Application.Extensions;
+using Foundry.Communications.Infrastructure.Persistence;
+using Foundry.Communications.Infrastructure.Persistence.Repositories;
+using Foundry.Communications.Infrastructure.Services;
+using Foundry.Shared.Contracts.Communications.Email;
+using Foundry.Shared.Kernel.MultiTenancy;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace Foundry.Communications.Infrastructure.Extensions;
+
+public static partial class CommunicationsModuleExtensions
+{
+    public static IServiceCollection AddCommunicationsModule(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddCommunicationsApplication();
+        services.AddCommunicationsPersistence(configuration);
+        services.AddCommunicationsServices(configuration);
+
+        return services;
+    }
+
+    private static IServiceCollection AddCommunicationsPersistence(
+        this IServiceCollection services,
+        IConfiguration _)
+    {
+        services.AddDbContext<CommunicationsDbContext>((sp, options) =>
+        {
+            string? connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection");
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "communications");
+            });
+            options.AddInterceptors(sp.GetRequiredService<TenantSaveChangesInterceptor>());
+        });
+
+        // Email repositories
+        services.AddScoped<IEmailMessageRepository, EmailMessageRepository>();
+        services.AddScoped<IEmailPreferenceRepository, EmailPreferenceRepository>();
+
+        // InApp notification repositories
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+
+        // Announcement repositories
+        services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
+        services.AddScoped<IChangelogRepository, ChangelogRepository>();
+        services.AddScoped<IAnnouncementDismissalRepository, AnnouncementDismissalRepository>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddCommunicationsServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Email services
+        services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
+        services.AddScoped<IEmailService, SmtpEmailService>();
+        services.AddScoped<IEmailTemplateService, SimpleEmailTemplateService>();
+
+        // InApp notification services
+        services.AddScoped<INotificationService, SignalRNotificationService>();
+
+        return services;
+    }
+
+    public static async Task<WebApplication> InitializeCommunicationsModuleAsync(
+        this WebApplication app)
+    {
+        try
+        {
+            await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+            CommunicationsDbContext db = scope.ServiceProvider.GetRequiredService<CommunicationsDbContext>();
+            await db.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            ILogger logger = app.Services.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("CommunicationsModule");
+            LogStartupFailed(logger, ex);
+        }
+
+        return app;
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Communications module startup failed. Ensure PostgreSQL is running.")]
+    private static partial void LogStartupFailed(ILogger logger, Exception ex);
+}

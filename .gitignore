@@ -1,0 +1,50 @@
+# Build outputs
+bin/
+obj/
+out/
+**/bin\\Debug/
+**/bin\\Release/
+**/obj\\Debug/
+**/obj\\Release/
+
+# IDE
+.idea/
+.vs/
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+
+# Environment
+.env
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test results
+TestResults/
+coverage/
+coverage-report/
+coverage-results/
+
+# NuGet
+*.nupkg
+packages/
+
+# Docker
+docker-compose.override.yml
+docker-compose.override.local.yml
+
+# Environment files (keep examples, ignore actual secrets)
+docker/.env
+.env.local
+.env.*.local
+
+# Worktrees
+.worktrees/

@@ -1,0 +1,137 @@
+# docker-compose.yml
+# Base infrastructure services - used by all environments
+
+services:
+  # ============================================
+  # DATABASE
+  # ============================================
+  postgres:
+    image: postgres:18-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-foundry}-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+      - ./init-keycloak-db.sql:/docker-entrypoint-initdb.d/02-init-keycloak-db.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - foundry
+    restart: unless-stopped
+
+  # ============================================
+  # EMAIL (Development)
+  # ============================================
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-foundry}-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - foundry
+    restart: unless-stopped
+
+  # ============================================
+  # CACHE & BACKPLANE (Valkey — Redis-compatible)
+  # ============================================
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-foundry}-valkey
+    command: valkey-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - foundry
+    restart: unless-stopped
+
+  # ============================================
+  # IDENTITY PROVIDER
+  # ============================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: ${COMPOSE_PROJECT_NAME:-foundry}-keycloak
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_db
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_HOSTNAME: http://localhost:8080
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q '200'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    networks:
+      - foundry
+    restart: unless-stopped
+
+  # ============================================
+  # OBSERVABILITY
+  # ============================================
+  # The Foundry API (run via dotnet run, not in Docker) needs these
+  # environment variables to export telemetry to the OTLP collector:
+  #
+  #   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+  #   OTEL_SERVICE_NAME=foundry-api
+  #
+  # OTEL_EXPORTER_OTLP_ENDPOINT — gRPC endpoint exposed by grafana-lgtm
+  # OTEL_SERVICE_NAME           — logical service name shown in traces/metrics
+  # ============================================
+  grafana-lgtm:
+    image: grafana/otel-lgtm:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-foundry}-grafana-lgtm
+    ports:
+      - "3000:3000"   # Grafana UI
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:-admin}
+    volumes:
+      # Mount custom dashboards into grafana-lgtm's provisioning path
+      - ./grafana/provisioning/dashboards/dashboards.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/foundry-dashboards.yaml:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - foundry
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  valkey_data:
+
+networks:
+  foundry:
+    driver: bridge

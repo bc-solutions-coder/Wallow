@@ -1,0 +1,10 @@
+namespace Foundry.Storage.Application.Queries.GetUploadPresignedUrl;
+
+public sealed record GetUploadPresignedUrlQuery(
+    Guid TenantId,
+    string BucketName,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    string? Path = null,
+    TimeSpan? Expiry = null);

@@ -1,0 +1,81 @@
+<Project>
+
+  <!-- ===========================================
+       .NET VERSION - CHANGE HERE FOR UPGRADES
+       To upgrade to .NET 10:
+       1. Update global.json sdk version to "10.0.100"
+       2. Change TargetFramework below to "net10.0"
+       3. Run: dotnet restore
+       4. Run: dotnet build
+       5. Fix any breaking changes
+       =========================================== -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors Condition="'$(GITHUB_ACTIONS)' == 'true'">true</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors Condition="'$(GITHUB_ACTIONS)' != 'true'">false</TreatWarningsAsErrors>
+    <!-- Enforce code style in CI builds; IDEs show warnings without blocking -->
+    <!-- Local enforcement: git config core.hooksPath .githooks (runs dotnet format on commit) -->
+    <EnforceCodeStyleInBuild Condition="'$(CI)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true'">true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <!-- Assembly information -->
+  <PropertyGroup>
+    <Company>Foundry</Company>
+    <Product>Foundry</Product>
+    <Copyright>Copyright © Foundry $([System.DateTime]::Now.Year)</Copyright>
+    <!-- CI overrides this via /p:Version -->
+    <Version>0.0.0-local</Version>
+  </PropertyGroup>
+
+  <!-- Build configuration -->
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn> <!-- Missing XML comments -->
+  </PropertyGroup>
+
+  <!-- Code Analysis Configuration -->
+  <PropertyGroup>
+    <AnalysisMode>All</AnalysisMode>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <!-- Deterministic builds for reproducibility -->
+  <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!-- Central package management -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- API Versioning - automatically included in all Api projects -->
+  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Api'))">
+    <PackageReference Include="Asp.Versioning.Mvc" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+  </ItemGroup>
+
+  <!-- Expose internal types to corresponding test projects -->
+  <!-- This allows test projects named "$(AssemblyName).Tests" to access internal types -->
+  <ItemGroup Condition="'$(IsTestProject)' != 'true'">
+    <InternalsVisibleTo Include="$(AssemblyName).Tests" />
+    <InternalsVisibleTo Include="Foundry.Tests.Common" />
+    <InternalsVisibleTo Include="Foundry.Api.Tests" />
+    <InternalsVisibleTo Include="Foundry.Architecture.Tests" />
+  </ItemGroup>
+
+  <!-- Build server configuration - prevent memory accumulation in CI -->
+  <PropertyGroup>
+    <!-- Only disable MSBuild node reuse in CI (needed for clean CI builds) -->
+    <DisableNodeReuse Condition="'$(CI)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true'">true</DisableNodeReuse>
+    <!-- Only disable shared Roslyn compiler in CI (IDEs need it for performance) -->
+    <UseSharedCompilation Condition="'$(CI)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true'">false</UseSharedCompilation>
+  </PropertyGroup>
+
+</Project>

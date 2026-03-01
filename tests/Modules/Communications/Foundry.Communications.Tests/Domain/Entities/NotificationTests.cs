@@ -1,0 +1,129 @@
+using Foundry.Communications.Domain.Channels.InApp.Entities;
+using Foundry.Communications.Domain.Channels.InApp.Enums;
+using Foundry.Communications.Domain.Channels.InApp.Events;
+using Foundry.Shared.Kernel.Identity;
+
+namespace Foundry.Communications.Domain.Tests.Entities;
+
+public class NotificationCreateTests
+{
+    [Fact]
+    public void Create_WithValidData_ReturnsUnreadNotification()
+    {
+        TenantId tenantId = TenantId.New();
+        Guid userId = Guid.NewGuid();
+
+        Notification notification = Notification.Create(
+            tenantId, userId, NotificationType.TaskAssigned, "Task assigned", "You have a new task");
+
+        notification.TenantId.Should().Be(tenantId);
+        notification.UserId.Should().Be(userId);
+        notification.Type.Should().Be(NotificationType.TaskAssigned);
+        notification.Title.Should().Be("Task assigned");
+        notification.Message.Should().Be("You have a new task");
+        notification.IsRead.Should().BeFalse();
+        notification.ReadAt.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(NotificationType.TaskAssigned)]
+    [InlineData(NotificationType.TaskCompleted)]
+    [InlineData(NotificationType.TaskComment)]
+    [InlineData(NotificationType.SystemAlert)]
+    [InlineData(NotificationType.BillingInvoice)]
+    [InlineData(NotificationType.Mention)]
+    [InlineData(NotificationType.Announcement)]
+    public void Create_WithDifferentTypes_SetsTypeCorrectly(NotificationType type)
+    {
+        Notification notification = Notification.Create(
+            TenantId.New(), Guid.NewGuid(), type, "Title", "Message");
+
+        notification.Type.Should().Be(type);
+    }
+
+    [Fact]
+    public void Create_RaisesNotificationCreatedDomainEvent()
+    {
+        Guid userId = Guid.NewGuid();
+
+        Notification notification = Notification.Create(
+            TenantId.New(), userId, NotificationType.SystemAlert, "Alert", "System alert message");
+
+        notification.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<NotificationCreatedDomainEvent>()
+            .Which.UserId.Should().Be(userId);
+    }
+
+    [Fact]
+    public void Create_RaisesEventWithCorrectTitle()
+    {
+        Notification notification = Notification.Create(
+            TenantId.New(), Guid.NewGuid(), NotificationType.Mention, "You were mentioned", "Body");
+
+        NotificationCreatedDomainEvent domainEvent = notification.DomainEvents
+            .OfType<NotificationCreatedDomainEvent>().Single();
+
+        domainEvent.Title.Should().Be("You were mentioned");
+        domainEvent.Type.Should().Be(NotificationType.Mention.ToString());
+    }
+}
+
+public class NotificationMarkAsReadTests
+{
+    [Fact]
+    public void MarkAsRead_UnreadNotification_SetsIsReadToTrue()
+    {
+        Notification notification = Notification.Create(
+            TenantId.New(), Guid.NewGuid(), NotificationType.TaskAssigned, "Title", "Message");
+        notification.ClearDomainEvents();
+
+        notification.MarkAsRead();
+
+        notification.IsRead.Should().BeTrue();
+    }
+
+    [Fact]
+    public void MarkAsRead_UnreadNotification_SetsReadAt()
+    {
+        Notification notification = Notification.Create(
+            TenantId.New(), Guid.NewGuid(), NotificationType.TaskAssigned, "Title", "Message");
+        notification.ClearDomainEvents();
+        DateTime beforeRead = DateTime.UtcNow;
+
+        notification.MarkAsRead();
+
+        notification.ReadAt.Should().NotBeNull();
+        notification.ReadAt.Should().BeOnOrAfter(beforeRead);
+    }
+
+    [Fact]
+    public void MarkAsRead_RaisesNotificationReadDomainEvent()
+    {
+        Guid userId = Guid.NewGuid();
+        Notification notification = Notification.Create(
+            TenantId.New(), userId, NotificationType.TaskCompleted, "Title", "Message");
+        notification.ClearDomainEvents();
+
+        notification.MarkAsRead();
+
+        notification.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<NotificationReadDomainEvent>()
+            .Which.UserId.Should().Be(userId);
+    }
+
+    [Fact]
+    public void MarkAsRead_CalledTwice_UpdatesReadAtToLatest()
+    {
+        Notification notification = Notification.Create(
+            TenantId.New(), Guid.NewGuid(), NotificationType.SystemAlert, "Title", "Message");
+        notification.ClearDomainEvents();
+
+        notification.MarkAsRead();
+        DateTime? firstReadAt = notification.ReadAt;
+
+        notification.MarkAsRead();
+
+        notification.ReadAt.Should().BeOnOrAfter(firstReadAt!.Value);
+        notification.IsRead.Should().BeTrue();
+    }
+}

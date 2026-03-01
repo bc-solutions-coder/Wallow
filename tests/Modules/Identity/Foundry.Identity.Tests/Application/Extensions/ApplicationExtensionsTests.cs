@@ -1,0 +1,37 @@
+using FluentValidation;
+using Foundry.Identity.Application.Commands.CreateServiceAccount;
+using Foundry.Identity.Application.Commands.UpdateServiceAccountScopes;
+using Foundry.Identity.Application.Extensions;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Modules.Identity.Tests.Application.Extensions;
+
+public class ApplicationExtensionsTests
+{
+    [Fact]
+    public void AddIdentityApplication_RegistersValidatorsFromAssembly()
+    {
+        ServiceCollection services = new ServiceCollection();
+
+        services.AddIdentityApplication();
+
+        ServiceProvider provider = services.BuildServiceProvider();
+        IValidator<CreateServiceAccountCommand> createValidator =
+            provider.GetRequiredService<IValidator<CreateServiceAccountCommand>>();
+        IValidator<UpdateServiceAccountScopesCommand> updateValidator =
+            provider.GetRequiredService<IValidator<UpdateServiceAccountScopesCommand>>();
+
+        createValidator.Should().BeOfType<CreateServiceAccountValidator>();
+        updateValidator.Should().BeOfType<UpdateServiceAccountScopesValidator>();
+    }
+
+    [Fact]
+    public void AddIdentityApplication_ReturnsServiceCollection()
+    {
+        ServiceCollection services = new ServiceCollection();
+
+        IServiceCollection result = services.AddIdentityApplication();
+
+        result.Should().BeSameAs(services);
+    }
+}

@@ -39,7 +39,7 @@ dotnet ef migrations add MigrationName \
 
 ## Versioning
 
-Automated semver via [Conventional Commits](https://www.conventionalcommits.org/) + GitVersion. See `docs/VERSIONING_GUIDE.md`.
+Automated semver via [Conventional Commits](https://www.conventionalcommits.org/) + [release-please](https://github.com/googleapis/release-please). See `docs/VERSIONING_GUIDE.md`.
 
 **Commit message format:** `<type>[optional scope][!]: <description>`
 
@@ -48,11 +48,10 @@ Automated semver via [Conventional Commits](https://www.conventionalcommits.org/
 | `fix:` | Patch | `fix: resolve null ref in tenant resolver` |
 | `feat:` | Minor | `feat: add billing invoice export` |
 | `feat!:` | Major | `feat!: redesign authentication API` |
-| `chore:`, `refactor:`, `docs:`, `test:`, `ci:` | Patch | `chore: update dependencies` |
+| `chore:`, `refactor:`, `docs:`, `test:`, `ci:` | No release | `chore: update dependencies` |
 
-- **Dev branch** produces pre-release versions: `0.2.0-dev.3`
-- **Main branch** produces release versions: `0.2.0`
-- Version stamps assemblies, Docker images, and git tags
+- Merges to main create/update a **Release PR** with changelog and version bump
+- Merging the Release PR tags, creates a GitHub Release, and triggers Docker image publish
 
 ## Local Development
 

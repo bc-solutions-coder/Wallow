@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Foundry.Storage.Domain\Foundry.Storage.Domain.csproj" />
     <ProjectReference Include="..\Foundry.Storage.Application\Foundry.Storage.Application.csproj" />
     <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Contracts\Foundry.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Infrastructure\Foundry.Shared.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

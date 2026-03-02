@@ -25,6 +25,7 @@
     <ProjectReference Include="..\Foundry.Identity.Domain\Foundry.Identity.Domain.csproj" />
     <ProjectReference Include="..\Foundry.Identity.Application\Foundry.Identity.Application.csproj" />
     <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Kernel\Foundry.Shared.Kernel.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Foundry.Shared.Infrastructure\Foundry.Shared.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

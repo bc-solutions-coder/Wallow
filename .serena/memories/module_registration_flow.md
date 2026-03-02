@@ -51,9 +51,7 @@ builder.Services.AddFoundryModules(builder.Configuration);
 builder.Host.UseWolverine(opts =>
 {
     opts.Services.AddResourceMessaging();
-    opts.Services.AddMarten(config.GetConnectionString("DefaultConnection")!)
-        .IntegrateWithWolverine();
-    
+
     opts.UseRabbitMq(rabbitMQ => {
         rabbitMQ.HostName = rabbitConfig.Host;
         rabbitMQ.Port = rabbitConfig.Port;
@@ -152,130 +150,82 @@ private static IServiceCollection AddBillingPersistence(
 
 ### Stateless Module (no persistence)
 
-Example: SupportModule (`src/Modules/Support/Foundry.Support.Api/SupportModule.cs`)
+Example: A module that wraps external HTTP services with no local persistence.
 
 ```csharp
-public sealed class SupportModule : IModuleRegistration
+public sealed class ExternalIntegrationModule : IModuleRegistration
 {
-    public static string ModuleName => "Support";
+    public static string ModuleName => "ExternalIntegration";
     public static Assembly? HandlerAssembly => null;  // No CQRS handlers
 
     public static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSupportInfrastructure(configuration);  // HTTP clients only
+        services.AddExternalIntegrationInfrastructure(configuration);  // HTTP clients only
     }
 
     public static Task InitializeAsync(WebApplication app) => Task.CompletedTask;
-    
+
     public static void ConfigureMessaging(WolverineOptions options) { }  // No messaging
 }
 ```
 
 **Infrastructure Pattern for Stateless Modules**:
 ```csharp
-public static IServiceCollection AddSupportInfrastructure(
+public static IServiceCollection AddExternalIntegrationInfrastructure(
     this IServiceCollection services, IConfiguration configuration)
 {
     // Only HTTP clients and providers, no DbContext
-    services.AddHttpClient<ZendeskApiClient>();
-    services.AddScoped<ISupportProvider, EmailOnlyProvider>();
-    services.AddScoped<ISupportProviderFactory, SupportProviderFactory>();
+    services.AddHttpClient<ExternalApiClient>();
+    services.AddScoped<IExternalProvider, ExternalProvider>();
+    services.AddScoped<IExternalProviderFactory, ExternalProviderFactory>();
     return services;
-}
-```
-
-### Event-Sourced Module (Marten)
-
-Example: InventoryModule (`src/Modules/Inventory/Foundry.Inventory.Api/InventoryModule.cs`)
-
-```csharp
-public sealed class InventoryModule : IModuleRegistration
-{
-    public static string ModuleName => "Inventory";
-    
-    public static Assembly? HandlerAssembly =>
-        typeof(Application.Commands.AdjustStock.AdjustStockCommand).Assembly;
-
-    public static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
-    {
-        var connectionString = configuration.GetConnectionString("DefaultConnection")!;
-        
-        services.AddMarten(opts =>
-        {
-            opts.Connection(connectionString);
-            opts.DatabaseSchemaName = "inventory";
-            
-            // Register event streams
-            opts.Events.AddEventType<StockAdjustedEvent>();
-            opts.Events.AddEventType<StockReservedEvent>();
-            
-            // Register projections
-            opts.Projections.Add<StockLevelProjection>(ProjectionLifecycle.Inline);
-        })
-        .IntegrateWithWolverine()
-        .ApplyAllDatabaseChangesOnStartup();
-
-        services.AddInventoryApplication();  // Validators
-    }
-
-    public static Task InitializeAsync(WebApplication app) => Task.CompletedTask;
-
-    public static void ConfigureMessaging(WolverineOptions options)
-    {
-        options.PublishMessage<StockAdjustedEvent>().ToRabbitExchange("inventory-events");
-        options.PublishMessage<StockReservedEvent>().ToRabbitExchange("inventory-events");
-        options.ListenToRabbitQueue("inventory-inbox");
-    }
 }
 ```
 
 ### Module with Background Jobs
 
-Example: StatusPageModule (`src/Modules/StatusPage/Foundry.StatusPage.Api/StatusPageModule.cs`)
+Example: A module that has both persistence and recurring background jobs (e.g., Communications).
 
 ```csharp
-public sealed class StatusPageModule : IModuleRegistration
+public sealed class CommunicationsModule : IModuleRegistration
 {
-    public static string ModuleName => "StatusPage";
-    
+    public static string ModuleName => "Communications";
+
     public static Assembly? HandlerAssembly =>
-        typeof(Application.Commands.CreateComponent.CreateComponentCommand).Assembly;
+        typeof(Application.Commands.SendMessage.SendMessageCommand).Assembly;
 
     public static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddStatusPageApplication();
-        services.AddStatusPageInfrastructure(configuration);
-        
+        services.AddCommunicationsApplication();
+        services.AddCommunicationsInfrastructure(configuration);
+
         // Register recurring jobs
-        services.AddSingleton<IRecurringJobRegistration, StatusPageRecurringJobRegistration>();
+        services.AddSingleton<IRecurringJobRegistration, CommunicationsRecurringJobRegistration>();
     }
 
     public static async Task InitializeAsync(WebApplication app)
     {
         using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<StatusPageDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<CommunicationsDbContext>();
         await db.Database.MigrateAsync();
-        
-        // Seed default components
-        await StatusComponentSeeder.SeedAsync(db);
     }
 
     public static void ConfigureMessaging(WolverineOptions options)
     {
-        options.PublishMessage<ComponentStatusChangedEvent>().ToRabbitExchange("statuspage-events");
-        options.ListenToRabbitQueue("statuspage-inbox");
+        options.PublishMessage<MessageSentEvent>().ToRabbitExchange("communications-events");
+        options.ListenToRabbitQueue("communications-inbox");
     }
 }
 ```
 
 **Background Job Registration Pattern**:
 ```csharp
-public class StatusPageRecurringJobRegistration : IRecurringJobRegistration
+public class CommunicationsRecurringJobRegistration : IRecurringJobRegistration
 {
     public void RegisterJobs()
     {
-        RecurringJob.AddOrUpdate<CheckComponentStatusJob>(
-            "check-component-status",
+        RecurringJob.AddOrUpdate<ProcessOutboundMessagesJob>(
+            "process-outbound-messages",
             job => job.ExecuteAsync(),
             "*/5 * * * *");  // Every 5 minutes
     }
@@ -512,23 +462,9 @@ Each module owns its PostgreSQL schema:
 |--------|--------|------|-------|
 | Identity | `identity` | EF Core | Multi-tenancy interceptor |
 | Billing | `billing` | EF Core | Multi-tenancy interceptor |
-| Catalog | `catalog` | EF Core | Multi-tenancy interceptor |
+| Communications | `communications` | EF Core | Multi-tenancy interceptor |
+| Configuration | `configuration` | EF Core | Multi-tenancy interceptor |
 | Storage | `storage` | EF Core | Multi-tenancy interceptor |
-| Assets | `assets` | EF Core | Multi-tenancy interceptor |
-| Activity | `activity` | EF Core | Multi-tenancy interceptor |
-| Notifications | `notifications` | EF Core | Multi-tenancy interceptor |
-| Comments | `comments` | EF Core | Multi-tenancy interceptor |
-| KnowledgeBase | `knowledge_base` | EF Core | Multi-tenancy interceptor |
-| Scheduler | `scheduler` | EF Core | Multi-tenancy interceptor |
-| StatusPage | `statuspage` | EF Core | Multi-tenancy interceptor |
-| Compliance | `compliance` | EF Core | Multi-tenancy interceptor |
-| Onboarding | `onboarding` | EF Core | Multi-tenancy interceptor |
-| Metering | `metering` | EF Core | Multi-tenancy interceptor |
-| Reporting | `reporting` | EF Core | Multi-tenancy interceptor |
-| Email | `email` | EF Core | No interceptor (singleton lifetime) |
-| Inventory | `inventory` | Marten Event Store | Event-sourced |
-| Sales | `sales` | Marten Event Store | Event-sourced |
-| Scheduling | `scheduling` | Marten Event Store | Event-sourced |
 | Wolverine | `wolverine` | Shared Infrastructure | Outbox/inbox |
 | Hangfire | `hangfire` | Shared Infrastructure | Job storage |
 
@@ -554,7 +490,7 @@ services.AddDbContext<{Module}DbContext>((sp, options) =>
 
 - Automatically stamps `TenantId` on save for entities implementing `ITenantEntity`
 - Registered in: `Identity.Infrastructure.Extensions`
-- All DbContexts use it except Email (singleton lifetime issue)
+- All DbContexts use it (note: singleton-lifetime DbContexts cannot use this interceptor)
 - Resolves current tenant from `ITenantContext`
 
 **Tenant Resolution Flow**:
@@ -601,26 +537,11 @@ await app.UseFoundryModulesAsync();  // Initializes all modules
 
 | Module | Type | IModuleRegistration | HandlerAssembly | ConfigureMessaging | Background Jobs |
 |--------|------|---------------------|-----------------|-------------------|-----------------|
-| Identity | Standard | Yes | No | Yes (5 events) | No |
-| Billing | Standard | Yes | Yes | Yes (4 events, 1 queue) | No |
-| Notifications | Standard | Yes | Yes | Yes (1 queue) | No |
-| Catalog | Standard | Yes | Yes | Yes (3 events, 1 queue) | No |
-| Storage | Standard | Yes | Yes | Yes (2 events) | No |
-| Assets | Standard | Yes | Yes | Yes (3 events, 1 queue) | No |
-| Activity | Standard | Yes | Yes | Yes (1 queue) | Yes |
-| Comments | Standard | Yes | Yes | Yes (2 events) | No |
-| Support | Stateless | Yes | No | No | No |
-| KnowledgeBase | Standard | Yes | Yes | Yes (2 events) | No |
-| Scheduler | Standard | Yes | Yes | Yes (3 events, 1 queue) | No |
-| StatusPage | Standard | Yes | Yes | Yes (2 events, 1 queue) | Yes |
-| Compliance | Standard | Yes | Yes | Yes (2 events) | Yes |
-| Onboarding | Standard | Yes | Yes | Yes (2 events) | Yes |
-| Metering | Standard | Yes | Yes | Yes (2 events, 1 queue) | Yes |
-| Reporting | Standard | Yes | Yes | Yes (1 queue) | Yes |
-| Email | Standard | Yes | Yes | Yes (1 queue) | No |
-| Inventory | Event-Sourced | Yes | Yes | Yes (3 events, 1 queue) | No |
-| Sales | Event-Sourced | Yes | Yes | Yes (4 events, 1 queue) | No |
-| Scheduling | Event-Sourced | Yes | Yes | Yes (3 events, 1 queue) | No |
+| Identity | Standard | Yes | No | Yes | No |
+| Billing | Standard | Yes | Yes | Yes | No |
+| Communications | Standard | Yes | Yes | Yes | No |
+| Configuration | Standard | Yes | Yes | Yes | No |
+| Storage | Standard | Yes | Yes | Yes | No |
 
 ## Key Patterns and Best Practices
 
@@ -679,31 +600,11 @@ Standard conventions:
 
 ```
 Foundry.Api (composition root)
-├─ Platform Infrastructure Modules
-│  ├─ Identity → Keycloak, JWT, TenantContext, Permissions
-│  ├─ Billing → Invoices, Subscriptions, Payment processing
-│  ├─ Email → SMTP, templates, delivery tracking
-│  ├─ Notifications → SignalR, push notifications, templates
-│  └─ Storage → S3/Local file storage
-│
-├─ Domain Building Block Modules
-│  ├─ Catalog → Items, categories, metadata, relationships
-│  ├─ Assets → Domain-level file management
-│  ├─ Inventory (Marten) → Stock levels, reservations, adjustments
-│  ├─ Sales (Marten) → Orders, transactions, payments
-│  └─ Scheduling (Marten) → Time slots, availability, bookings
-│
-└─ Feature Modules
-   ├─ Activity → Audit logs, user activity tracking
-   ├─ Comments → Threaded comments, moderation
-   ├─ Support → Ticket integration, help desk
-   ├─ KnowledgeBase → Articles, documentation, search
-   ├─ Scheduler → Job scheduling, calendar
-   ├─ StatusPage → System status, uptime monitoring
-   ├─ Compliance → GDPR, data retention, privacy
-   ├─ Onboarding → User onboarding flows, tutorials
-   ├─ Metering → Usage tracking, billing integration
-   └─ Reporting → Analytics, dashboards, exports
+├─ Identity → Keycloak, JWT, TenantContext, Permissions
+├─ Billing → Invoices, Subscriptions, Payment processing
+├─ Communications → Messaging, notifications, email delivery
+├─ Configuration → Tenant/system configuration, feature flags
+└─ Storage → S3/Local file storage
 
 All modules share:
 ├─ Foundry.Shared.Kernel → Base types, ITenantContext, Result<T>, IModuleRegistration
@@ -711,7 +612,6 @@ All modules share:
 ├─ Foundry.Shared.Infrastructure → ModuleDiscovery, common services
 ├─ Wolverine → CQRS mediator, RabbitMQ transport
 ├─ EF Core → Multi-schema, auto-migrations
-├─ Marten → Event sourcing (Inventory, Sales, Scheduling)
 ├─ PostgreSQL → All data storage
 ├─ Hangfire → Background jobs
 └─ RabbitMQ → Event-driven communication
@@ -719,7 +619,7 @@ All modules share:
 
 ## Initialization Order
 
-1. **Wolverine Setup** - Handlers, RabbitMQ routing, Marten integration
+1. **Wolverine Setup** - Handlers, RabbitMQ routing
 2. **Redis SignalR Backplane** - Real-time communication
 3. **Core Services** - HttpContext, Controllers, Kernel services
 4. **Module Service Registration** - `AddFoundryModules()` discovers and registers all modules

@@ -111,9 +111,8 @@ public abstract class TenantAwareDbContext<TContext> : DbContext where TContext 
 - `Notifications` → subsumed by `Communications/Channels/InApp`
 - `Announcements` → subsumed by `Communications/Announcements`
 - `Metering` → absorbed into `Billing` (migration confirms)
-- `Scheduling` vs `Scheduler` → unclear distinction, consolidate to one
 
-**Fix:** Delete the redundant scaffolds. Keep whichever of `Scheduling`/`Scheduler` you prefer (recommend `Scheduling` for calendar/appointments, delete `Scheduler` since Hangfire handles job scheduling).
+**Fix:** Delete the redundant scaffolds.
 
 **Priority:** P1 — reduces confusion for fork developers.
 
@@ -382,30 +381,7 @@ A `NotificationDispatcher` selects channels based on user preferences, tenant co
 - `Notifications` — subsumed by Communications/Channels/InApp
 - `Announcements` — subsumed by Communications/Announcements
 - `Metering` — absorbed into Billing
-- `Scheduler` — Hangfire handles job scheduling; keep `Scheduling` for calendar/appointments
-
-### Keep & Prioritize for Implementation
-
-| Priority | Module | Rationale |
-|----------|--------|-----------|
-| **High** | Support | Every SaaS needs a ticket/support system |
-| **High** | AuditLog | Cross-cutting compliance requirement |
-| **High** | Onboarding | User onboarding flows are universal |
-| **Medium** | Activity | Activity feeds are common in SaaS |
-| **Medium** | KnowledgeBase | Self-service docs/help center |
-| **Medium** | Compliance | GDPR/privacy features |
-| **Medium** | Reporting | Analytics/reporting is a platform concern |
-| **Low** | Catalog | Product-specific; may not belong in generic base |
-| **Low** | Inventory | Product-specific |
-| **Low** | Sales | Product-specific |
-| **Low** | Assets | Product-specific |
-| **Low** | Comments | Could be a feature of other modules rather than standalone |
-| **Low** | StatusPage | Nice-to-have but not foundational |
-| **Low** | Workflows | Elsa engine already provides this |
-
-### Move to Fork-Only (too product-specific for generic base)
-- `Catalog`, `Inventory`, `Sales` — these are business-domain modules, not platform infrastructure
-- Consider removing them from the base repo and implementing them in specific product forks
+- `Scheduler` — Hangfire handles job scheduling
 
 ---
 
@@ -463,11 +439,8 @@ A `NotificationDispatcher` selects channels based on user preferences, tenant co
 5. Build, refine, then genericize and PR back
 
 ### Phase 5: Module Expansion (ongoing)
-1. Support module (tickets)
-2. AuditLog module (compliance)
-3. Onboarding module (user flows)
-4. Activity module (feeds)
-5. KnowledgeBase module (help center)
+
+Additional modules are built in product forks first, then genericized back into Foundry once stable.
 
 ---
 

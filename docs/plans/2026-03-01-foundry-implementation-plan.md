@@ -412,7 +412,7 @@ public static IServiceCollection AddFoundryModules(
 - Delete: `src/Modules/Notifications/` (entire directory — subsumed by Communications/Channels/InApp)
 - Delete: `src/Modules/Announcements/` (entire directory — subsumed by Communications/Announcements)
 - Delete: `src/Modules/Metering/` (entire directory — absorbed into Billing)
-- Delete: `src/Modules/Scheduler/` (entire directory — Hangfire handles job scheduling; keep Scheduling for calendar)
+- Delete: `src/Modules/Scheduler/` (entire directory — Hangfire handles job scheduling)
 - Delete: corresponding `tests/Modules/` directories for each
 
 **Steps:**

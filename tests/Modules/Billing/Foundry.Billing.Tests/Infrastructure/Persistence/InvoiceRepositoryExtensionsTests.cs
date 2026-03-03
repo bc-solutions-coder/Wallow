@@ -4,7 +4,6 @@ using Foundry.Billing.Infrastructure.Persistence;
 using Foundry.Billing.Infrastructure.Persistence.Repositories;
 using Foundry.Tests.Common.Bases;
 using Foundry.Tests.Common.Fixtures;
-using Microsoft.EntityFrameworkCore;
 
 namespace Foundry.Billing.Tests.Infrastructure.Persistence;
 

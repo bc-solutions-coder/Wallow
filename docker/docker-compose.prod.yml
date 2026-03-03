@@ -16,6 +16,7 @@ services:
 
   rabbitmq:
     # No external ports
+    ports: !reset []
     logging:
       driver: json-file
       options:
@@ -62,6 +63,27 @@ services:
         max-file: "5"
 
   # No Mailpit in production - use real SMTP service
+
+  foundry-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   keycloak_certs:

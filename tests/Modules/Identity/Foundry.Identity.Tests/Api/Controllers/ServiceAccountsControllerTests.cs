@@ -5,7 +5,6 @@ using Foundry.Identity.Application.DTOs;
 using Foundry.Identity.Application.Interfaces;
 using Foundry.Identity.Domain.Enums;
 using Foundry.Identity.Domain.Identity;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Foundry.Identity.Tests.Api.Controllers;

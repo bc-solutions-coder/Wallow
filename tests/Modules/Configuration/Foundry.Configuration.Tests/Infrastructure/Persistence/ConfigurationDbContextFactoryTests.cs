@@ -1,5 +1,4 @@
 using Foundry.Configuration.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace Foundry.Configuration.Tests.Infrastructure.Persistence;
 

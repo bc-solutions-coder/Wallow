@@ -4,7 +4,7 @@ using Foundry.Billing.Application.Metering.Services;
 using Foundry.Billing.Domain.Metering.Enums;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Hybrid;
 using Wolverine;
 
 namespace Foundry.Billing.Api.Middleware;
@@ -16,11 +16,15 @@ namespace Foundry.Billing.Api.Middleware;
 public sealed class MeteringMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly IMemoryCache _cache;
+    private readonly HybridCache _cache;
     private const string ApiCallsMeterCode = "api.calls";
-    private static readonly TimeSpan _cacheDuration = TimeSpan.FromSeconds(30);
+    private static readonly HybridCacheEntryOptions _cacheOptions = new()
+    {
+        Expiration = TimeSpan.FromSeconds(30),
+        LocalCacheExpiration = TimeSpan.FromSeconds(30)
+    };
 
-    public MeteringMiddleware(RequestDelegate next, IMemoryCache cache)
+    public MeteringMiddleware(RequestDelegate next, HybridCache cache)
     {
         _next = next;
         _cache = cache;
@@ -37,11 +41,9 @@ public sealed class MeteringMiddleware
 
         // Check quota with caching by tenant ID to avoid per-request DB lookups
         string cacheKey = $"quota:{tenantContext.TenantId.Value}:{ApiCallsMeterCode}";
-        QuotaCheckResult quotaCheck = await _cache.GetOrCreateAsync(cacheKey, entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = _cacheDuration;
-            return meteringService.CheckQuotaAsync(ApiCallsMeterCode);
-        }) ?? QuotaCheckResult.Unlimited;
+        QuotaCheckResult quotaCheck = await _cache.GetOrCreateAsync(cacheKey,
+            _ => new ValueTask<QuotaCheckResult>(meteringService.CheckQuotaAsync(ApiCallsMeterCode)),
+            _cacheOptions);
 
         if (!quotaCheck.IsAllowed && quotaCheck.ActionIfExceeded == QuotaAction.Block)
         {

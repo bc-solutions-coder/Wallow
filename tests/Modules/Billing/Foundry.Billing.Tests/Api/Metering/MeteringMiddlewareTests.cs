@@ -5,7 +5,8 @@ using Foundry.Billing.Domain.Metering.Enums;
 using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
+using Foundry.Tests.Common.Fakes;
+using Microsoft.Extensions.Caching.Hybrid;
 using Wolverine;
 
 namespace Foundry.Billing.Tests.Api.Metering;
@@ -30,7 +31,7 @@ public class MeteringMiddlewareTests
             _nextCalled = true;
             return Task.CompletedTask;
         };
-        IMemoryCache cache = Substitute.For<IMemoryCache>();
+        HybridCache cache = new NoOpHybridCache();
         _middleware = new MeteringMiddleware(next, cache);
     }
 

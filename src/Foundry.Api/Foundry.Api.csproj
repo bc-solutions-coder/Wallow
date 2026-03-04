@@ -27,6 +27,7 @@
     <PackageReference Include="StackExchange.Redis" />
 
     <!-- Distributed Caching -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
 
     <!-- Logging -->

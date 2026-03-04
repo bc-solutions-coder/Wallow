@@ -34,7 +34,6 @@ public sealed class InvoiceLineItemConfiguration : IEntityTypeConfiguration<Invo
                 .HasColumnName("unit_price")
                 .HasPrecision(18, 2)
                 .IsRequired();
-
             money.Property(m => m.Currency)
                 .HasColumnName("currency")
                 .HasMaxLength(3)
@@ -51,7 +50,6 @@ public sealed class InvoiceLineItemConfiguration : IEntityTypeConfiguration<Invo
                 .HasColumnName("line_total")
                 .HasPrecision(18, 2)
                 .IsRequired();
-
             money.Property(m => m.Currency)
                 .HasColumnName("line_total_currency")
                 .HasMaxLength(3)

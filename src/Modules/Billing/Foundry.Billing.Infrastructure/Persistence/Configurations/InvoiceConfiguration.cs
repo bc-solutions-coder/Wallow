@@ -48,7 +48,6 @@ public sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
                 .HasColumnName("total_amount")
                 .HasPrecision(18, 2)
                 .IsRequired();
-
             money.Property(m => m.Currency)
                 .HasColumnName("currency")
                 .HasMaxLength(3)

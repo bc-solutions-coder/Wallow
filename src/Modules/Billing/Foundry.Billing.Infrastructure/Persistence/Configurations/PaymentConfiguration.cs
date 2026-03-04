@@ -44,7 +44,6 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
                 .HasColumnName("amount")
                 .HasPrecision(18, 2)
                 .IsRequired();
-
             money.Property(m => m.Currency)
                 .HasColumnName("currency")
                 .HasMaxLength(3)

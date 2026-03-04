@@ -49,12 +49,13 @@ public sealed class StorageBucketConfiguration : IEntityTypeConfiguration<Storag
         builder.OwnsOne(b => b.Retention, retention =>
         {
             retention.Property(r => r.Days)
-                .HasColumnName("retention_days");
-
+                .HasColumnName("retention_days")
+                .IsRequired();
             retention.Property(r => r.Action)
                 .HasColumnName("retention_action")
                 .HasConversion<string>()
-                .HasMaxLength(20);
+                .HasMaxLength(20)
+                .IsRequired();
         });
 
         builder.Property(b => b.Versioning)

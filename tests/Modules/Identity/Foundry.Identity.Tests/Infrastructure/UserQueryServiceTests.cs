@@ -1,7 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Foundry.Identity.Infrastructure.Services;
-using Microsoft.Extensions.Caching.Memory;
+using Foundry.Tests.Common.Fakes;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 using Foundry.Identity.Infrastructure;
@@ -13,7 +14,7 @@ namespace Foundry.Identity.Tests.Infrastructure;
 public class UserQueryServiceTests
 {
     private readonly ILogger<UserQueryService> _logger = Substitute.For<ILogger<UserQueryService>>();
-    private readonly IMemoryCache _cache = Substitute.For<IMemoryCache>();
+    private readonly HybridCache _cache = new NoOpHybridCache();
 
     [Fact]
     public async Task GetNewUsersCountAsync_WithMembersInRange_ReturnsCount()

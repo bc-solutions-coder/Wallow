@@ -44,7 +44,6 @@ public sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subscri
                 .HasColumnName("price")
                 .HasPrecision(18, 2)
                 .IsRequired();
-
             money.Property(m => m.Currency)
                 .HasColumnName("currency")
                 .HasMaxLength(3)

@@ -1,10 +1,11 @@
+using System.Collections.Frozen;
 using Foundry.Shared.Kernel.Identity.Authorization;
 
 namespace Foundry.Identity.Infrastructure.Authorization;
 
 public static class RolePermissionMapping
 {
-    private static readonly Dictionary<string, string[]> _rolePermissions = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly FrozenDictionary<string, string[]> _rolePermissions = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
     {
         ["admin"] = PermissionType.All.ToArray(),
         ["manager"] =
@@ -30,7 +31,7 @@ public static class RolePermissionMapping
             PermissionType.StorageRead,
             PermissionType.StorageWrite,
         ]
-    };
+    }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     public static IEnumerable<string> GetPermissions(IEnumerable<string> roles)
     {

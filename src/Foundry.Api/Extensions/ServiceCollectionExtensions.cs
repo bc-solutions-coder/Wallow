@@ -129,7 +129,7 @@ internal static class ServiceCollectionExtensions
 
             options.AddPolicy("auth", httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    GetTenantPartitionKey(httpContext),
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = RateLimitDefaults.AuthPermitLimit,
@@ -139,9 +139,7 @@ internal static class ServiceCollectionExtensions
 
             options.AddPolicy("upload", httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                        ?? httpContext.Connection.RemoteIpAddress?.ToString()
-                        ?? "unknown",
+                    GetTenantPartitionKey(httpContext),
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = RateLimitDefaults.UploadPermitLimit,
@@ -151,16 +149,56 @@ internal static class ServiceCollectionExtensions
 
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    GetTenantPartitionKey(httpContext),
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = RateLimitDefaults.GlobalPermitLimit,
                         Window = TimeSpan.FromHours(RateLimitDefaults.GlobalWindowHours),
                         QueueLimit = 0
                     }));
+
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                HttpContext httpContext = context.HttpContext;
+                httpContext.Response.StatusCode = 429;
+                httpContext.Response.ContentType = "application/problem+json";
+
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
+                {
+                    httpContext.Response.Headers["Retry-After"] = ((int)retryAfter.TotalSeconds).ToString();
+                }
+
+                if (context.Lease.TryGetMetadata(MetadataName.ReasonPhrase, out string? reason))
+                {
+                    httpContext.Response.Headers["X-RateLimit-Limit"] = reason;
+                }
+
+                httpContext.Response.Headers["X-RateLimit-Remaining"] = "0";
+
+                Microsoft.AspNetCore.Mvc.ProblemDetails problemDetails = new()
+                {
+                    Status = 429,
+                    Type = "about:blank",
+                    Title = "Too Many Requests",
+                    Detail = "Rate limit exceeded. Please retry after the duration indicated in the Retry-After header.",
+                    Instance = httpContext.Request.Path
+                };
+
+                await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+            };
         });
 
         return services;
+    }
+
+    private static string GetTenantPartitionKey(HttpContext httpContext)
+    {
+        if (httpContext.Items.TryGetValue("TenantId", out object? tenantId) && tenantId is string tenantIdStr)
+        {
+            return tenantIdStr;
+        }
+
+        return httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 
     public static IServiceCollection AddObservability(
@@ -204,10 +242,7 @@ internal static class ServiceCollectionExtensions
                     {
                         options.Filter = FilterTelemetryRequest;
                     })
-                    .AddEntityFrameworkCoreInstrumentation(options =>
-                    {
-                        options.SetDbStatementForText = environment.IsDevelopment();
-                    })
+                    .AddEntityFrameworkCoreInstrumentation()
                     .AddHttpClientInstrumentation(options =>
                     {
                         string keycloakBaseUrl = (configuration["Keycloak:auth-server-url"] ?? "").TrimEnd('/');

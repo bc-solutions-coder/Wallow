@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
 using Foundry.Shared.Contracts.Identity;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,14 +9,17 @@ namespace Foundry.Identity.Infrastructure.Services;
 public sealed partial class UserQueryService : IUserQueryService
 {
     private readonly HttpClient _httpClient;
-    private readonly IMemoryCache _cache;
+    private readonly HybridCache _cache;
     private readonly ILogger<UserQueryService> _logger;
     private readonly string _realm;
-    private static readonly TimeSpan _cacheDuration = TimeSpan.FromSeconds(60);
+    private static readonly HybridCacheEntryOptions _cacheOptions = new()
+    {
+        Expiration = TimeSpan.FromSeconds(60)
+    };
 
     public UserQueryService(
         IHttpClientFactory httpClientFactory,
-        IMemoryCache cache,
+        HybridCache cache,
         IOptions<KeycloakOptions> keycloakOptions,
         ILogger<UserQueryService> logger)
     {
@@ -31,22 +34,18 @@ public sealed partial class UserQueryService : IUserQueryService
         string cacheKey = $"user-email:{userId}";
         try
         {
-            string email = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+            return await _cache.GetOrCreateAsync(cacheKey, async cancel =>
             {
-                entry.AbsoluteExpirationRelativeToNow = _cacheDuration;
-
-                HttpResponseMessage response = await _httpClient.GetAsync($"/admin/realms/{_realm}/users/{userId}", ct);
+                HttpResponseMessage response = await _httpClient.GetAsync($"/admin/realms/{_realm}/users/{userId}", cancel);
                 if (!response.IsSuccessStatusCode)
                 {
                     LogGetUserEmailFailed(userId);
                     return string.Empty;
                 }
 
-                UserEmailRepresentation? user = await response.Content.ReadFromJsonAsync<UserEmailRepresentation>(ct);
+                UserEmailRepresentation? user = await response.Content.ReadFromJsonAsync<UserEmailRepresentation>(cancel);
                 return user?.Email ?? string.Empty;
-            }) ?? string.Empty;
-
-            return email;
+            }, _cacheOptions, cancellationToken: ct);
         }
         catch (Exception ex)
         {
@@ -60,11 +59,9 @@ public sealed partial class UserQueryService : IUserQueryService
         string cacheKey = $"new-users-count:{tenantId}:{from:O}:{to:O}";
         try
         {
-            int count = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+            int count = await _cache.GetOrCreateAsync(cacheKey, async cancel =>
             {
-                entry.AbsoluteExpirationRelativeToNow = _cacheDuration;
-
-                List<UserMemberRepresentation>? members = await GetOrganizationMembersAsync(tenantId, ct);
+                List<UserMemberRepresentation>? members = await GetOrganizationMembersAsync(tenantId, cancel);
                 if (members == null || members.Count == 0)
                 {
                     return 0;
@@ -76,7 +73,7 @@ public sealed partial class UserQueryService : IUserQueryService
                 return members.Count(m =>
                     m.CreatedTimestamp >= fromTimestamp &&
                     m.CreatedTimestamp.Value < toTimestamp);
-            });
+            }, _cacheOptions, cancellationToken: ct);
 
             LogNewUsersCount(count, tenantId, from, to);
             return count;
@@ -93,11 +90,9 @@ public sealed partial class UserQueryService : IUserQueryService
         string cacheKey = $"active-users-count:{tenantId}";
         try
         {
-            int count = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+            int count = await _cache.GetOrCreateAsync(cacheKey, async cancel =>
             {
-                entry.AbsoluteExpirationRelativeToNow = _cacheDuration;
-
-                List<UserMemberRepresentation>? members = await GetOrganizationMembersAsync(tenantId, ct);
+                List<UserMemberRepresentation>? members = await GetOrganizationMembersAsync(tenantId, cancel);
                 if (members == null || members.Count == 0)
                 {
                     return 0;
@@ -108,7 +103,7 @@ public sealed partial class UserQueryService : IUserQueryService
                 return members.Count(m =>
                     m.Enabled == true &&
                     (!m.CreatedTimestamp.HasValue || m.CreatedTimestamp.Value >= thirtyDaysAgo));
-            });
+            }, _cacheOptions, cancellationToken: ct);
 
             LogActiveUsersCount(count, tenantId);
             return count;
@@ -125,13 +120,11 @@ public sealed partial class UserQueryService : IUserQueryService
         string cacheKey = $"total-users-count:{tenantId}";
         try
         {
-            int count = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+            int count = await _cache.GetOrCreateAsync(cacheKey, async cancel =>
             {
-                entry.AbsoluteExpirationRelativeToNow = _cacheDuration;
-
-                List<UserMemberRepresentation>? members = await GetOrganizationMembersAsync(tenantId, ct);
+                List<UserMemberRepresentation>? members = await GetOrganizationMembersAsync(tenantId, cancel);
                 return members?.Count ?? 0;
-            });
+            }, _cacheOptions, cancellationToken: ct);
 
             LogTotalUsersCount(count, tenantId);
             return count;

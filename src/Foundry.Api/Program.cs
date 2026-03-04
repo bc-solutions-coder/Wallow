@@ -5,6 +5,7 @@ using Elsa.Workflows.Api;
 using Foundry.Api.Extensions;
 using Foundry.Shared.Infrastructure.Core.Cache;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Hybrid;
 using Foundry.Api.Hubs;
 using Foundry.Api.Jobs;
 using Foundry.Api.Logging;
@@ -220,6 +221,16 @@ try
             sp.GetRequiredService<IOptions<Microsoft.Extensions.Caching.StackExchangeRedis.RedisCacheOptions>>();
         Microsoft.Extensions.Caching.StackExchangeRedis.RedisCache inner = new(options);
         return new InstrumentedDistributedCache(inner);
+    });
+
+    // HybridCache — L1 in-memory + L2 distributed (Valkey) with automatic stampede protection
+    builder.Services.AddHybridCache(options =>
+    {
+        options.DefaultEntryOptions = new HybridCacheEntryOptions
+        {
+            LocalCacheExpiration = TimeSpan.FromMinutes(5),
+            Expiration = TimeSpan.FromMinutes(30),
+        };
     });
 
     // SignalR with Redis backplane — reuses the singleton IConnectionMultiplexer registered above

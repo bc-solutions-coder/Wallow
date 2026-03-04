@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Foundry.Shared.Infrastructure.Core.Resilience;
 
 namespace Foundry.Identity.Infrastructure.Extensions;
 
@@ -94,10 +95,10 @@ public static class IdentityInfrastructureExtensions
         {
             KeycloakOptions options = sp.GetRequiredService<IOptions<KeycloakOptions>>().Value;
             client.BaseAddress = new Uri(options.AuthorityUrl);
-        }).AddStandardResilienceHandler();
+        }).AddFoundryResilienceHandler("identity-provider");
 
         // Token service for auth proxy (no auth required on this client)
-        services.AddHttpClient("KeycloakTokenClient").AddStandardResilienceHandler();
+        services.AddHttpClient("KeycloakTokenClient").AddFoundryResilienceHandler("identity-provider");
 
         services.AddMemoryCache();
         services.AddScoped<IKeycloakAdminService, KeycloakAdminService>();

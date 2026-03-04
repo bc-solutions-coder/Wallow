@@ -26,6 +26,9 @@
     <!-- CQRS & Messaging -->
     <PackageReference Include="WolverineFx" />
 
+    <!-- Resilience -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+
     <!-- Logging -->
     <PackageReference Include="Serilog.AspNetCore" />
 

@@ -1,8 +1,13 @@
 using Foundry.Communications.Application.Channels.Email.Interfaces;
 using Foundry.Communications.Infrastructure.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Polly;
+using Polly.Registry;
+using Polly.Retry;
+using Polly.Timeout;
 
 namespace Foundry.Communications.Tests.Infrastructure.Services;
 
@@ -10,6 +15,7 @@ public class SmtpEmailProviderTests : IAsyncDisposable
 {
     private readonly ILogger<SmtpEmailProvider> _logger = Substitute.For<ILogger<SmtpEmailProvider>>();
     private readonly SmtpConnectionPool _connectionPool;
+    private readonly ResiliencePipelineProvider<string> _pipelineProvider;
 
     public SmtpEmailProviderTests()
     {
@@ -24,6 +30,24 @@ public class SmtpEmailProviderTests : IAsyncDisposable
         };
         _connectionPool = new SmtpConnectionPool(
             Options.Create(defaultSettings), NullLogger<SmtpConnectionPool>.Instance);
+
+        ServiceCollection services = new ServiceCollection();
+        services.AddResiliencePipeline("smtp", builder =>
+        {
+            builder
+                .AddRetry(new RetryStrategyOptions
+                {
+                    MaxRetryAttempts = 3,
+                    BackoffType = DelayBackoffType.Exponential,
+                    Delay = TimeSpan.FromSeconds(2)
+                })
+                .AddTimeout(new TimeoutStrategyOptions
+                {
+                    Timeout = TimeSpan.FromSeconds(30)
+                });
+        });
+        ServiceProvider sp = services.BuildServiceProvider();
+        _pipelineProvider = sp.GetRequiredService<ResiliencePipelineProvider<string>>();
     }
 
     public async ValueTask DisposeAsync()
@@ -45,7 +69,7 @@ public class SmtpEmailProviderTests : IAsyncDisposable
         };
 
         IOptions<SmtpSettings> options = Options.Create(smtpSettings);
-        return new SmtpEmailProvider(_connectionPool, options, _logger);
+        return new SmtpEmailProvider(_connectionPool, options, _pipelineProvider, _logger);
     }
 
     [Fact]
@@ -211,7 +235,7 @@ public class SmtpEmailProviderTests : IAsyncDisposable
 
         IOptions<SmtpSettings> options = Options.Create(settings);
 
-        SmtpEmailProvider provider = new(_connectionPool, options, _logger);
+        SmtpEmailProvider provider = new(_connectionPool, options, _pipelineProvider, _logger);
 
         provider.Should().NotBeNull();
     }

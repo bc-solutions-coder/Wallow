@@ -9,6 +9,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using RabbitMQ.Client;
+using Foundry.Shared.Infrastructure.Core.Resilience;
 using Serilog;
 
 namespace Foundry.Api.Extensions;
@@ -111,10 +112,8 @@ internal static class ServiceCollectionExtensions
                 .AddCheck<S3HealthCheck>("s3", tags: ["storage", "ready"]);
         }
 
-        services.AddHttpClient("HealthChecks", client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(5);
-        });
+        services.AddHttpClient("HealthChecks")
+            .AddFoundryResilienceHandler("health-check");
 
         services.AddSingleton<IHealthCheckPublisher, HealthCheckMetricsPublisher>();
 

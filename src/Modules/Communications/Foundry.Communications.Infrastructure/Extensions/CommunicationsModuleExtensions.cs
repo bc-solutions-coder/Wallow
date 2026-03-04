@@ -17,7 +17,11 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Foundry.Shared.Infrastructure.Core.Resilience;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
+using Polly.Timeout;
 
 namespace Foundry.Communications.Infrastructure.Extensions;
 
@@ -86,6 +90,22 @@ public static partial class CommunicationsModuleExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // SMTP resilience pipeline
+        services.AddResiliencePipeline("smtp", builder =>
+        {
+            builder
+                .AddRetry(new RetryStrategyOptions
+                {
+                    MaxRetryAttempts = 3,
+                    BackoffType = DelayBackoffType.Exponential,
+                    Delay = TimeSpan.FromSeconds(2)
+                })
+                .AddTimeout(new TimeoutStrategyOptions
+                {
+                    Timeout = TimeSpan.FromSeconds(30)
+                });
+        });
+
         // Email services
         services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
         RegisterEmailProvider(services, configuration);
@@ -105,7 +125,7 @@ public static partial class CommunicationsModuleExtensions
         if (!string.IsNullOrEmpty(twilioAccountSid))
         {
             services.AddHttpClient<TwilioSmsProvider>()
-                .AddStandardResilienceHandler();
+                .AddFoundryResilienceHandler("external-api");
             services.AddScoped<ISmsProvider, TwilioSmsProvider>();
         }
         else

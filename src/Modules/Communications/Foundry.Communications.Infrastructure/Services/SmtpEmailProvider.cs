@@ -4,15 +4,19 @@ using Foundry.Communications.Application.Channels.Email.Telemetry;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
+using Polly;
+using Polly.Registry;
 
 namespace Foundry.Communications.Infrastructure.Services;
 
 public sealed partial class SmtpEmailProvider(
     SmtpConnectionPool connectionPool,
     IOptions<SmtpSettings> settings,
+    ResiliencePipelineProvider<string> pipelineProvider,
     ILogger<SmtpEmailProvider> logger) : IEmailProvider
 {
     private readonly SmtpSettings _settings = settings.Value;
+    private readonly ResiliencePipeline _smtpPipeline = pipelineProvider.GetPipeline("smtp");
 
     public async Task<EmailDeliveryResult> SendAsync(EmailDeliveryRequest request, CancellationToken cancellationToken = default)
     {
@@ -22,7 +26,7 @@ public sealed partial class SmtpEmailProvider(
 
         try
         {
-            await SendWithRetryAsync(message, cancellationToken);
+            await SendWithPipelineAsync(message, cancellationToken);
             return new EmailDeliveryResult(true, null);
         }
         catch (Exception ex)
@@ -86,64 +90,40 @@ public sealed partial class SmtpEmailProvider(
         return message;
     }
 
-    private async Task SendWithRetryAsync(MimeMessage message, CancellationToken cancellationToken = default)
+    private async Task SendWithPipelineAsync(MimeMessage message, CancellationToken cancellationToken = default)
     {
         using Activity? activity = EmailModuleTelemetry.ActivitySource.StartActivity("Email.Send");
         activity?.SetTag("email.to", message.To.ToString());
         activity?.SetTag("email.template", message.Subject);
 
-        int attempt = 0;
-        Exception? lastException = null;
-
-        while (attempt < _settings.MaxRetries)
+        try
         {
-            attempt++;
-
-            try
+            await _smtpPipeline.ExecuteAsync(async ct =>
             {
-                await connectionPool.SendAsync(message, cancellationToken);
+                await connectionPool.SendAsync(message, ct);
+            }, cancellationToken);
 
-                string recipients = message.To.ToString();
-                LogEmailSent(logger, recipients, message.Subject, attempt);
-                return;
-            }
-            catch (Exception ex)
-            {
-                lastException = ex;
-
-                LogEmailAttemptFailed(logger, ex, message.To.ToString(), attempt, _settings.MaxRetries);
-
-                if (attempt < _settings.MaxRetries)
-                {
-                    int delayMs = (int)Math.Pow(2, attempt) * 1000;
-                    await Task.Delay(delayMs, cancellationToken);
-                }
-            }
+            string recipients = message.To.ToString();
+            LogEmailSent(logger, recipients, message.Subject);
         }
-
-        LogEmailAllAttemptsFailed(logger, lastException, message.To.ToString(), _settings.MaxRetries);
-
-        activity?.SetStatus(ActivityStatusCode.Error, lastException?.Message ?? "All retry attempts failed");
-        if (lastException is not null)
+        catch (Exception ex)
         {
+            LogEmailFailed(logger, ex, message.To.ToString());
+
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.AddEvent(new ActivityEvent("exception", tags: new ActivityTagsCollection
             {
-                { "exception.type", lastException.GetType().FullName },
-                { "exception.message", lastException.Message }
+                { "exception.type", ex.GetType().FullName },
+                { "exception.message", ex.Message }
             }));
-        }
 
-        throw new InvalidOperationException(
-            $"Failed to send email after {_settings.MaxRetries} attempts. See inner exception for details.",
-            lastException);
+            throw;
+        }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Email sent successfully to {To} with subject '{Subject}' on attempt {Attempt}")]
-    private static partial void LogEmailSent(ILogger logger, string to, string subject, int attempt);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Email sent successfully to {To} with subject '{Subject}'")]
+    private static partial void LogEmailSent(ILogger logger, string to, string subject);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to send email to {To} on attempt {Attempt}/{MaxRetries}")]
-    private static partial void LogEmailAttemptFailed(ILogger logger, Exception ex, string to, int attempt, int maxRetries);
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to send email to {To} after {MaxRetries} attempts")]
-    private static partial void LogEmailAllAttemptsFailed(ILogger logger, Exception? ex, string to, int maxRetries);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to send email to {To} after all retry attempts")]
+    private static partial void LogEmailFailed(ILogger logger, Exception ex, string to);
 }

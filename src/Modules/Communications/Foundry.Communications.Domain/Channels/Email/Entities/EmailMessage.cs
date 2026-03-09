@@ -19,7 +19,8 @@ public sealed class EmailMessage : AggregateRoot<EmailMessageId>, ITenantScoped
     public string? FailureReason { get; private set; }
     public int RetryCount { get; private set; }
 
-    private EmailMessage() { }
+    // ReSharper disable once UnusedMember.Local
+    private EmailMessage() { } // EF Core
 
     private EmailMessage(
         TenantId tenantId,

@@ -14,7 +14,8 @@ public sealed class ChannelPreference : AggregateRoot<ChannelPreferenceId>, ITen
     public string NotificationType { get; private set; } = string.Empty;
     public bool IsEnabled { get; private set; }
 
-    private ChannelPreference() { }
+    // ReSharper disable once UnusedMember.Local
+    private ChannelPreference() { } // EF Core
 
     private ChannelPreference(
         Guid userId,

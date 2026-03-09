@@ -23,7 +23,8 @@ public sealed class Announcement : AggregateRoot<AnnouncementId>, ITenantScoped
     public string? ImageUrl { get; private set; }
     public AnnouncementStatus Status { get; private set; }
 
-    private Announcement() { }
+    // ReSharper disable once UnusedMember.Local
+    private Announcement() { } // EF Core
 
     private Announcement(
         TenantId tenantId,

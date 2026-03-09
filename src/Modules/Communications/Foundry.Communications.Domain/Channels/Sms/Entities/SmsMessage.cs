@@ -21,7 +21,8 @@ public sealed class SmsMessage : AggregateRoot<SmsMessageId>, ITenantScoped
 
     private const int MaxBodyLength = 1600;
 
-    private SmsMessage() { }
+    // ReSharper disable once UnusedMember.Local
+    private SmsMessage() { } // EF Core
 
     private SmsMessage(
         TenantId tenantId,

@@ -15,6 +15,7 @@ public sealed class InvoiceLineItem : Entity<InvoiceLineItemId>
     public int Quantity { get; private set; }
     public Money LineTotal { get; private set; } = null!;
 
+    // ReSharper disable once UnusedMember.Local
     private InvoiceLineItem() { } // EF Core
 
     private InvoiceLineItem(InvoiceId invoiceId, string description, Money unitPrice, int quantity)

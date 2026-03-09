@@ -51,6 +51,7 @@ public sealed class Invoice : AggregateRoot<InvoiceId>, ITenantScoped, IHasCusto
         CustomFields = customFields;
     }
 
+    // ReSharper disable once UnusedMember.Local
     private Invoice() { } // EF Core
 
     private Invoice(Guid userId, string invoiceNumber, string currency, DateTime? dueDate)

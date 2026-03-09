@@ -64,7 +64,9 @@ public sealed class TenantAwareDbContextTests : IDisposable
 
     private sealed class TestDbContext : TenantAwareDbContext<TestDbContext>
     {
+        // ReSharper disable once UnusedMember.Local
         public DbSet<TenantScopedEntity> TenantScopedEntities => Set<TenantScopedEntity>();
+        // ReSharper disable once UnusedMember.Local
         public DbSet<NonTenantEntity> NonTenantEntities => Set<NonTenantEntity>();
 
         public TestDbContext(DbContextOptions<TestDbContext> options, ITenantContext tenantContext)

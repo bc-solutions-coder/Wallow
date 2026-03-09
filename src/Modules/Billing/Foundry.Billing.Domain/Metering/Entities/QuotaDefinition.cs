@@ -42,6 +42,7 @@ public sealed class QuotaDefinition : AuditableEntity<QuotaDefinitionId>, ITenan
     /// </summary>
     public QuotaAction OnExceeded { get; private set; }
 
+    // ReSharper disable once UnusedMember.Local
     private QuotaDefinition() { } // EF Core
 
     private QuotaDefinition(

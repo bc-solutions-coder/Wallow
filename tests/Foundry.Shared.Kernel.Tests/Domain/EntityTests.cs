@@ -134,7 +134,6 @@ public class EntityTests
 
     private sealed class TestEntity : Entity<TestEntityId>
     {
-        public TestEntity() { }
         public TestEntity(TestEntityId id) : base(id) { }
     }
 

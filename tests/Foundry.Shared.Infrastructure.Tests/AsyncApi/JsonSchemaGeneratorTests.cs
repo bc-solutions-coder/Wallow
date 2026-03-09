@@ -42,9 +42,13 @@ public class JsonSchemaGeneratorTests
 
     private sealed record TestEvent
     {
+        // ReSharper disable once UnusedMember.Local
         public required Guid Id { get; init; }
+        // ReSharper disable once UnusedMember.Local
         public required string Name { get; init; }
+        // ReSharper disable once UnusedMember.Local
         public required decimal Amount { get; init; }
+        // ReSharper disable once UnusedMember.Local
         public string? OptionalField { get; init; }
     }
 
@@ -78,12 +82,15 @@ public class JsonSchemaGeneratorTests
 
     private sealed record EventWithCollection
     {
+        // ReSharper disable once UnusedMember.Local
         public required IReadOnlyList<LineItem> Items { get; init; }
     }
 
     private sealed record LineItem
     {
+        // ReSharper disable once UnusedMember.Local
         public required Guid ItemId { get; init; }
+        // ReSharper disable once UnusedMember.Local
         public required int Quantity { get; init; }
     }
 

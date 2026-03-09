@@ -41,6 +41,7 @@ public sealed class UsageRecord : Entity<UsageRecordId>, ITenantScoped
     /// </summary>
     public DateTime FlushedAt { get; private set; }
 
+    // ReSharper disable once UnusedMember.Local
     private UsageRecord() { } // EF Core
 
     private UsageRecord(

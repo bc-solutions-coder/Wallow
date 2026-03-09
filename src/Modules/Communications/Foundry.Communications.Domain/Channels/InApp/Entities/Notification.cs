@@ -21,7 +21,8 @@ public sealed class Notification : AggregateRoot<NotificationId>, ITenantScoped
     public DateTime? ExpiresAt { get; private set; }
     public bool IsArchived { get; private set; }
 
-    private Notification() { }
+    // ReSharper disable once UnusedMember.Local
+    private Notification() { } // EF Core
 
     private Notification(
         TenantId tenantId,

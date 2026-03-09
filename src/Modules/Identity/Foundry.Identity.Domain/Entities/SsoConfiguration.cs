@@ -67,7 +67,8 @@ public sealed class SsoConfiguration : AggregateRoot<SsoConfigurationId>, ITenan
     // Keycloak Reference
     public string? KeycloakIdpAlias { get; private set; }
 
-    private SsoConfiguration() { }
+    // ReSharper disable once UnusedMember.Local
+    private SsoConfiguration() { } // EF Core
 
     private SsoConfiguration(
         TenantId tenantId,

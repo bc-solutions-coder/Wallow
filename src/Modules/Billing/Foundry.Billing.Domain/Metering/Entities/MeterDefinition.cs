@@ -40,6 +40,7 @@ public sealed class MeterDefinition : AuditableEntity<MeterDefinitionId>
     /// </summary>
     public string? ValkeyKeyPattern { get; private set; }
 
+    // ReSharper disable once UnusedMember.Local
     private MeterDefinition() { } // EF Core
 
     private MeterDefinition(

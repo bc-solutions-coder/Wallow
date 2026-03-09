@@ -10,7 +10,8 @@ public sealed class ChangelogItem : Entity<ChangelogItemId>
     public string Description { get; private set; } = null!;
     public ChangeType Type { get; private set; }
 
-    private ChangelogItem() { }
+    // ReSharper disable once UnusedMember.Local
+    private ChangelogItem() { } // EF Core
 
     private ChangelogItem(ChangelogEntryId entryId, string description, ChangeType type)
         : base(ChangelogItemId.New())

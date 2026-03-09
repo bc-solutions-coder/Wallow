@@ -141,14 +141,14 @@ public sealed class QueryBenchmarks : IDisposable
 
     public void Dispose()
     {
-        _identityDbContext?.Dispose();
-        _identityConnection?.Dispose();
-        _configDbContext?.Dispose();
-        _configConnection?.Dispose();
-        _storageDbContext?.Dispose();
-        _storageConnection?.Dispose();
-        _billingDbContext?.Dispose();
-        _billingConnection?.Dispose();
+        _identityDbContext.Dispose();
+        _identityConnection.Dispose();
+        _configDbContext.Dispose();
+        _configConnection.Dispose();
+        _storageDbContext.Dispose();
+        _storageConnection.Dispose();
+        _billingDbContext.Dispose();
+        _billingConnection.Dispose();
         GC.SuppressFinalize(this);
     }
 

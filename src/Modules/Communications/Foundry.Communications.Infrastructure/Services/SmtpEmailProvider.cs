@@ -44,7 +44,7 @@ public sealed partial class SmtpEmailProvider(
             : MailboxAddress.Parse(request.From));
 
         message.To.Add(MailboxAddress.Parse(request.To));
-        message.Subject = request.Subject;
+        message.Subject = request.Subject ?? string.Empty;
 
         message.Body = new TextPart("html")
         {
@@ -73,7 +73,7 @@ public sealed partial class SmtpEmailProvider(
             : MailboxAddress.Parse(request.From));
 
         message.To.Add(MailboxAddress.Parse(request.To));
-        message.Subject = request.Subject;
+        message.Subject = request.Subject ?? string.Empty;
 
         BodyBuilder builder = new BodyBuilder
         {

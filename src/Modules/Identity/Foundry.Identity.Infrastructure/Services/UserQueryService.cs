@@ -156,7 +156,9 @@ public sealed partial class UserQueryService : IUserQueryService
 
     private sealed record UserMemberRepresentation
     {
+        // ReSharper disable once UnusedMember.Local
         public string? Id { get; init; }
+        // ReSharper disable once UnusedMember.Local
         public string? Email { get; init; }
         public bool? Enabled { get; init; }
         public long? CreatedTimestamp { get; init; }

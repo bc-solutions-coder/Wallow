@@ -52,6 +52,7 @@ public sealed class Subscription : AggregateRoot<SubscriptionId>, ITenantScoped,
         CustomFields = customFields;
     }
 
+    // ReSharper disable once UnusedMember.Local
     private Subscription() { } // EF Core
 
     private Subscription(

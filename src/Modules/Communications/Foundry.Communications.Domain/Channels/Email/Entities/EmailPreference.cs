@@ -13,7 +13,8 @@ public sealed class EmailPreference : AggregateRoot<EmailPreferenceId>, ITenantS
     public NotificationType NotificationType { get; private set; }
     public bool IsEnabled { get; private set; }
 
-    private EmailPreference() { }
+    // ReSharper disable once UnusedMember.Local
+    private EmailPreference() { } // EF Core
 
     private EmailPreference(
         Guid userId,

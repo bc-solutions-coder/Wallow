@@ -19,7 +19,8 @@ public sealed class ScimSyncLog : AggregateRoot<ScimSyncLogId>, ITenantScoped
     public string? RequestBody { get; private set; }
     public DateTime Timestamp { get; private set; }
 
-    private ScimSyncLog() { }
+    // ReSharper disable once UnusedMember.Local
+    private ScimSyncLog() { } // EF Core
 
     private ScimSyncLog(
         TenantId tenantId,

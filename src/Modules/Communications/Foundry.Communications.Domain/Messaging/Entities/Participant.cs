@@ -11,7 +11,8 @@ public sealed class Participant : Entity<ParticipantId>
     public DateTimeOffset? LastReadAt { get; private set; }
     public bool IsActive { get; private set; }
 
-    private Participant() { }
+    // ReSharper disable once UnusedMember.Local
+    private Participant() { } // EF Core
 
     private Participant(
         Guid userId,

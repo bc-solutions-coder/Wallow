@@ -47,6 +47,7 @@ public sealed class ServiceAccountMetadata : AuditableEntity<ServiceAccountMetad
     /// </summary>
     public IReadOnlyList<string> Scopes => _scopes.AsReadOnly();
 
+    // ReSharper disable once UnusedMember.Local
     private ServiceAccountMetadata() { } // EF Core
 
     private ServiceAccountMetadata(

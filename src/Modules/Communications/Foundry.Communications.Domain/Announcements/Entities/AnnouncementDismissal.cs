@@ -10,7 +10,8 @@ public sealed class AnnouncementDismissal : Entity<AnnouncementDismissalId>
     public UserId UserId { get; private set; }
     public DateTime DismissedAt { get; private set; }
 
-    private AnnouncementDismissal() { }
+    // ReSharper disable once UnusedMember.Local
+    private AnnouncementDismissal() { } // EF Core
 
     private AnnouncementDismissal(AnnouncementId announcementId, UserId userId, TimeProvider timeProvider)
         : base(AnnouncementDismissalId.New())

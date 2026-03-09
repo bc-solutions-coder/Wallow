@@ -15,7 +15,8 @@ public sealed class ChangelogEntry : AggregateRoot<ChangelogEntryId>
     private readonly List<ChangelogItem> _items = [];
     public IReadOnlyList<ChangelogItem> Items => _items.AsReadOnly();
 
-    private ChangelogEntry() { }
+    // ReSharper disable once UnusedMember.Local
+    private ChangelogEntry() { } // EF Core
 
     private ChangelogEntry(string version, string title, string content, DateTime releasedAt, TimeProvider timeProvider)
         : base(ChangelogEntryId.New())

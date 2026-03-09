@@ -18,7 +18,8 @@ public sealed class ScimConfiguration : AggregateRoot<ScimConfigurationId>, ITen
     public string? DefaultRole { get; private set; }
     public bool DeprovisionOnDelete { get; private set; }
 
-    private ScimConfiguration() { }
+    // ReSharper disable once UnusedMember.Local
+    private ScimConfiguration() { } // EF Core
 
     private ScimConfiguration(
         TenantId tenantId,

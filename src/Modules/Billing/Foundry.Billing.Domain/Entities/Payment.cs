@@ -28,6 +28,7 @@ public sealed class Payment : AggregateRoot<PaymentId>, ITenantScoped, IHasCusto
         CustomFields = customFields;
     }
 
+    // ReSharper disable once UnusedMember.Local
     private Payment() { } // EF Core
 
     private Payment(

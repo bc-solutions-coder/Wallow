@@ -34,6 +34,7 @@ public sealed class ApiScope : Entity<ApiScopeId>
     /// </summary>
     public bool IsDefault { get; private set; }
 
+    // ReSharper disable once UnusedMember.Local
     private ApiScope() { } // EF Core
 
     private ApiScope(string code, string displayName, string category, string? description, bool isDefault)

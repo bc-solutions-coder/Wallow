@@ -12,7 +12,8 @@ public sealed class Message : Entity<MessageId>
     public DateTimeOffset SentAt { get; private set; }
     public MessageStatus Status { get; private set; }
 
-    private Message() { }
+    // ReSharper disable once UnusedMember.Local
+    private Message() { } // EF Core
 
     private Message(ConversationId conversationId, Guid senderId, string body, TimeProvider timeProvider)
         : base(MessageId.New())

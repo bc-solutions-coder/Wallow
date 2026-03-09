@@ -13,7 +13,8 @@ public sealed class SmsPreference : Entity<SmsPreferenceId>, ITenantScoped
     public PhoneNumber PhoneNumber { get; private set; } = null!;
     public bool IsOptedIn { get; init; }
 
-    private SmsPreference() { }
+    // ReSharper disable once UnusedMember.Local
+    private SmsPreference() { } // EF Core
 
     private SmsPreference(
         Guid userId,

@@ -21,7 +21,8 @@ public sealed class Conversation : AggregateRoot<ConversationId>, ITenantScoped
     private readonly List<Message> _messages = [];
     public IReadOnlyList<Message> Messages => _messages.AsReadOnly();
 
-    private Conversation() { }
+    // ReSharper disable once UnusedMember.Local
+    private Conversation() { } // EF Core
 
     private Conversation(TenantId tenantId, bool isGroup, string? subject, TimeProvider timeProvider)
         : base(ConversationId.New())

@@ -7,13 +7,17 @@ public class AsyncApiDocumentGeneratorTests
 {
     private sealed record TestOrderPlaced
     {
+        // ReSharper disable once UnusedMember.Local
         public required Guid OrderId { get; init; }
+        // ReSharper disable once UnusedMember.Local
         public required decimal Total { get; init; }
     }
 
     private sealed record TestPaymentReceived
     {
+        // ReSharper disable once UnusedMember.Local
         public required Guid PaymentId { get; init; }
+        // ReSharper disable once UnusedMember.Local
         public required string Currency { get; init; }
     }
 

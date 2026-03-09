@@ -6,9 +6,9 @@ using Foundry.Shared.Kernel.MultiTenancy;
 using Foundry.Shared.Kernel.Results;
 using Foundry.Shared.Kernel.Services;
 
-namespace Foundry.Configuration.Application.Commands;
+namespace Foundry.Configuration.Application.Commands.CreateCustomFieldDefinition;
 
-public sealed record CreateCustomFieldDefinition(
+public sealed record CreateCustomFieldDefinitionCommand(
     string EntityType,
     string FieldKey,
     string DisplayName,
@@ -38,7 +38,7 @@ public sealed class CreateCustomFieldDefinitionHandler
     }
 
     public async Task<Result<CustomFieldDefinitionDto>> Handle(
-        CreateCustomFieldDefinition command,
+        CreateCustomFieldDefinitionCommand command,
         CancellationToken cancellationToken)
     {
         if (await _repository.FieldKeyExistsAsync(command.EntityType, command.FieldKey, cancellationToken))

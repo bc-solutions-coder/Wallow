@@ -1,4 +1,4 @@
-namespace Foundry.Shared.Infrastructure.Auditing;
+namespace Foundry.Shared.Infrastructure.Core.Auditing;
 
 public class AuditEntry
 {

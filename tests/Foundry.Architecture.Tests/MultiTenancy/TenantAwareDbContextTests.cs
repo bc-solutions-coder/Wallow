@@ -1,4 +1,4 @@
-using Foundry.Shared.Infrastructure.Persistence;
+using Foundry.Shared.Infrastructure.Core.Persistence;
 using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.Data.Sqlite;

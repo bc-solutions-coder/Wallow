@@ -1,4 +1,4 @@
-using Foundry.Shared.Infrastructure.Persistence;
+using Foundry.Shared.Infrastructure.Core.Persistence;
 
 namespace Foundry.Shared.Infrastructure.Tests.Persistence;
 

@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Foundry.Shared.Infrastructure.Middleware;
+using Foundry.Shared.Infrastructure.Core.Middleware;
 using Wolverine;
 
 namespace Foundry.Shared.Infrastructure.Tests.Middleware

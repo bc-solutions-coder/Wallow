@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Foundry.Shared.Infrastructure.Auditing;
+namespace Foundry.Shared.Infrastructure.Core.Auditing;
 
 public sealed partial class AuditInterceptor : SaveChangesInterceptor
 {

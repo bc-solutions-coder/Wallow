@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Foundry.Api.Hubs;
 using Foundry.Shared.Contracts.Realtime;
-using Foundry.Shared.Infrastructure.Services;
+using Foundry.Shared.Infrastructure.Core.Services;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Foundry.Api.Services;

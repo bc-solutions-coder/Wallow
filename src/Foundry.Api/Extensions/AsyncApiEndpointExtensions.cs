@@ -1,5 +1,5 @@
 using System.Reflection;
-using Foundry.Shared.Infrastructure.AsyncApi;
+using Foundry.Shared.Infrastructure.Workflows.AsyncApi;
 
 namespace Foundry.Api.Extensions;
 

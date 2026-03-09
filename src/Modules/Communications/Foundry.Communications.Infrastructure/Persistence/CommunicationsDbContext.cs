@@ -4,7 +4,7 @@ using Foundry.Communications.Domain.Channels.InApp.Entities;
 using Foundry.Communications.Domain.Channels.Sms.Entities;
 using Foundry.Communications.Domain.Messaging.Entities;
 using Foundry.Communications.Domain.Preferences.Entities;
-using Foundry.Shared.Infrastructure.Persistence;
+using Foundry.Shared.Infrastructure.Core.Persistence;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 

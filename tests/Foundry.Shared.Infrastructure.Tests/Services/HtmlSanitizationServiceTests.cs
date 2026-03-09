@@ -1,4 +1,4 @@
-using Foundry.Shared.Infrastructure.Services;
+using Foundry.Shared.Infrastructure.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Foundry.Shared.Infrastructure.Tests.Services;

@@ -3,9 +3,9 @@ using Foundry.Configuration.Domain.Entities;
 using Foundry.Configuration.Domain.Exceptions;
 using Foundry.Configuration.Domain.Identity;
 
-namespace Foundry.Configuration.Application.Commands;
+namespace Foundry.Configuration.Application.Commands.DeactivateCustomFieldDefinition;
 
-public sealed record DeactivateCustomFieldDefinition(Guid Id);
+public sealed record DeactivateCustomFieldDefinitionCommand(Guid Id);
 
 public sealed class DeactivateCustomFieldDefinitionHandler
 {
@@ -19,7 +19,7 @@ public sealed class DeactivateCustomFieldDefinitionHandler
     }
 
     public async Task Handle(
-        DeactivateCustomFieldDefinition command,
+        DeactivateCustomFieldDefinitionCommand command,
         CancellationToken cancellationToken)
     {
         CustomFieldDefinition? definition = await _repository.GetByIdAsync(

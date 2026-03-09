@@ -1,7 +1,7 @@
 using Foundry.Api.Hubs;
 using Foundry.Api.Services;
 using Foundry.Shared.Contracts.Realtime;
-using Foundry.Shared.Infrastructure.Services;
+using Foundry.Shared.Infrastructure.Core.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute.ExceptionExtensions;

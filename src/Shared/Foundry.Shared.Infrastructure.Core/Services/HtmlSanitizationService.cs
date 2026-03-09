@@ -1,7 +1,7 @@
 using Ganss.Xss;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Foundry.Shared.Infrastructure.Services;
+namespace Foundry.Shared.Infrastructure.Core.Services;
 
 public interface IHtmlSanitizationService
 {

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Foundry.Shared.Infrastructure.Workflows;
+namespace Foundry.Shared.Infrastructure.Workflows.Workflows;
 
 public static class ElsaExtensions
 {

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
-namespace Foundry.Shared.Infrastructure.Persistence;
+namespace Foundry.Shared.Infrastructure.Core.Persistence;
 
 /// <summary>
 /// ValueComparer for Dictionary&lt;string, object&gt; properties stored as JSON.

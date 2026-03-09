@@ -1,5 +1,5 @@
 using System.Text.Json.Nodes;
-using Foundry.Shared.Infrastructure.AsyncApi;
+using Foundry.Shared.Infrastructure.Workflows.AsyncApi;
 
 namespace Foundry.Shared.Infrastructure.Tests.AsyncApi;
 

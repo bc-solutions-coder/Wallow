@@ -1,4 +1,4 @@
-using Foundry.Configuration.Application.Commands;
+using Foundry.Configuration.Application.Commands.DeactivateCustomFieldDefinition;
 using Foundry.Configuration.Application.Contracts;
 using Foundry.Configuration.Domain.Entities;
 using Foundry.Configuration.Domain.Exceptions;
@@ -29,7 +29,7 @@ public class DeactivateCustomFieldDefinitionHandlerTests
         _repository.GetByIdAsync(Arg.Any<CustomFieldDefinitionId>(), Arg.Any<CancellationToken>())
             .Returns(definition);
 
-        DeactivateCustomFieldDefinition command = new(definition.Id.Value);
+        DeactivateCustomFieldDefinitionCommand command = new(definition.Id.Value);
 
         await _handler.Handle(command, CancellationToken.None);
 
@@ -44,7 +44,7 @@ public class DeactivateCustomFieldDefinitionHandlerTests
         _repository.GetByIdAsync(Arg.Any<CustomFieldDefinitionId>(), Arg.Any<CancellationToken>())
             .Returns((CustomFieldDefinition?)null);
 
-        DeactivateCustomFieldDefinition command = new(Guid.NewGuid());
+        DeactivateCustomFieldDefinitionCommand command = new(Guid.NewGuid());
 
         Func<Task> act = () => _handler.Handle(command, CancellationToken.None);
 
@@ -64,7 +64,7 @@ public class DeactivateCustomFieldDefinitionHandlerTests
         _repository.GetByIdAsync(Arg.Any<CustomFieldDefinitionId>(), Arg.Any<CancellationToken>())
             .Returns(definition);
 
-        DeactivateCustomFieldDefinition command = new(definition.Id.Value);
+        DeactivateCustomFieldDefinitionCommand command = new(definition.Id.Value);
 
         Func<Task> act = () => _handler.Handle(command, CancellationToken.None);
 

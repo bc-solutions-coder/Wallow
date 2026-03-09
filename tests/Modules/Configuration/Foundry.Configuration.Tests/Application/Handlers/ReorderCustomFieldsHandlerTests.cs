@@ -1,4 +1,4 @@
-using Foundry.Configuration.Application.Commands;
+using Foundry.Configuration.Application.Commands.ReorderCustomFields;
 using Foundry.Configuration.Application.Contracts;
 using Foundry.Configuration.Domain.Entities;
 using Foundry.Configuration.Domain.Exceptions;
@@ -35,7 +35,7 @@ public class ReorderCustomFieldsHandlerTests
         _repository.GetByEntityTypeAsync("Invoice", true, Arg.Any<CancellationToken>())
             .Returns(definitions);
 
-        ReorderCustomFields command = new("Invoice", [field3.Id.Value, field1.Id.Value, field2.Id.Value]);
+        ReorderCustomFieldsCommand command = new("Invoice", [field3.Id.Value, field1.Id.Value, field2.Id.Value]);
 
         await _handler.Handle(command, CancellationToken.None);
 
@@ -55,7 +55,7 @@ public class ReorderCustomFieldsHandlerTests
             .Returns(definitions);
 
         Guid unknownId = Guid.NewGuid();
-        ReorderCustomFields command = new("Invoice", [unknownId]);
+        ReorderCustomFieldsCommand command = new("Invoice", [unknownId]);
 
         Func<Task> act = () => _handler.Handle(command, CancellationToken.None);
 
@@ -71,7 +71,7 @@ public class ReorderCustomFieldsHandlerTests
         _repository.GetByEntityTypeAsync("Invoice", true, Arg.Any<CancellationToken>())
             .Returns(definitions);
 
-        ReorderCustomFields command = new("Invoice", [field1.Id.Value]);
+        ReorderCustomFieldsCommand command = new("Invoice", [field1.Id.Value]);
 
         await _handler.Handle(command, CancellationToken.None);
 
@@ -85,7 +85,7 @@ public class ReorderCustomFieldsHandlerTests
         _repository.GetByEntityTypeAsync("Invoice", true, Arg.Any<CancellationToken>())
             .Returns(new List<CustomFieldDefinition>());
 
-        ReorderCustomFields command = new("Invoice", []);
+        ReorderCustomFieldsCommand command = new("Invoice", []);
 
         await _handler.Handle(command, CancellationToken.None);
 

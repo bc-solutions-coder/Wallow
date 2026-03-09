@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Foundry.Shared.Infrastructure.Auditing;
+using Foundry.Shared.Infrastructure.Core.Auditing;
 using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.AspNetCore.Http;

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Foundry.Billing.Domain.Entities;
 using Foundry.Billing.Domain.Identity;
-using Foundry.Shared.Infrastructure.Persistence;
+using Foundry.Shared.Infrastructure.Core.Persistence;
 using Foundry.Shared.Kernel.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

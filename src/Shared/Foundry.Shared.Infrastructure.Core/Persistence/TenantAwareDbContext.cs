@@ -5,7 +5,7 @@ using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
-namespace Foundry.Shared.Infrastructure.Persistence;
+namespace Foundry.Shared.Infrastructure.Core.Persistence;
 
 public abstract class TenantAwareDbContext<TContext> : DbContext where TContext : DbContext
 {

@@ -10,7 +10,7 @@ using Foundry.Communications.Application.Messaging.Queries.GetConversations;
 using Foundry.Communications.Application.Messaging.Queries.GetMessages;
 using Foundry.Communications.Application.Messaging.Queries.GetUnreadConversationCount;
 using Foundry.Communications.Application.Messaging.Interfaces;
-using Foundry.Shared.Infrastructure.Services;
+using Foundry.Shared.Infrastructure.Core.Services;
 using Foundry.Shared.Kernel.Results;
 using Foundry.Shared.Kernel.Services;
 using Foundry.Shared.Kernel.Identity.Authorization;

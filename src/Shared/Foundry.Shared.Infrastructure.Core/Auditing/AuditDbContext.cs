@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Foundry.Shared.Infrastructure.Auditing;
+namespace Foundry.Shared.Infrastructure.Core.Auditing;
 
 public sealed class AuditDbContext : DbContext
 {

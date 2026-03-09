@@ -3,7 +3,7 @@ using Foundry.Shared.Kernel.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Foundry.Shared.Infrastructure.Services;
+namespace Foundry.Shared.Infrastructure.Core.Services;
 
 public sealed class CurrentUserService : ICurrentUserService
 {

@@ -4,7 +4,7 @@ using Foundry.Shared.Kernel;
 using Foundry.Shared.Kernel.Domain;
 using Wolverine;
 
-namespace Foundry.Shared.Infrastructure.Middleware;
+namespace Foundry.Shared.Infrastructure.Core.Middleware;
 
 public static partial class WolverineModuleTaggingMiddleware
 {

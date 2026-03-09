@@ -1,4 +1,4 @@
-using Foundry.Configuration.Application.Commands;
+using Foundry.Configuration.Application.Commands.CreateCustomFieldDefinition;
 using Foundry.Configuration.Application.Contracts;
 using Foundry.Configuration.Application.Contracts.DTOs;
 using Foundry.Configuration.Domain.Entities;
@@ -28,7 +28,7 @@ public class CreateCustomFieldDefinitionHandlerTests
     [Fact]
     public async Task Handle_WithValidCommand_CreatesDefinitionAndReturnsDto()
     {
-        CreateCustomFieldDefinition command = new(
+        CreateCustomFieldDefinitionCommand command = new(
             EntityType: "Invoice",
             FieldKey: "po_number",
             DisplayName: "PO Number",
@@ -55,7 +55,7 @@ public class CreateCustomFieldDefinitionHandlerTests
     [Fact]
     public async Task Handle_WithDuplicateFieldKey_ReturnsConflictFailure()
     {
-        CreateCustomFieldDefinition command = new(
+        CreateCustomFieldDefinitionCommand command = new(
             EntityType: "Invoice",
             FieldKey: "po_number",
             DisplayName: "PO Number",
@@ -75,7 +75,7 @@ public class CreateCustomFieldDefinitionHandlerTests
     [Fact]
     public async Task Handle_WithDescription_SetsDescription()
     {
-        CreateCustomFieldDefinition command = new(
+        CreateCustomFieldDefinitionCommand command = new(
             EntityType: "Invoice",
             FieldKey: "department",
             DisplayName: "Department",
@@ -94,7 +94,7 @@ public class CreateCustomFieldDefinitionHandlerTests
     [Fact]
     public async Task Handle_WithIsRequired_SetsRequired()
     {
-        CreateCustomFieldDefinition command = new(
+        CreateCustomFieldDefinitionCommand command = new(
             EntityType: "Payment",
             FieldKey: "reference_id",
             DisplayName: "Reference ID",
@@ -115,7 +115,7 @@ public class CreateCustomFieldDefinitionHandlerTests
     {
         FieldValidationRules rules = new() { MaxLength = 50 };
 
-        CreateCustomFieldDefinition command = new(
+        CreateCustomFieldDefinitionCommand command = new(
             EntityType: "Invoice",
             FieldKey: "notes_field",
             DisplayName: "Notes",
@@ -141,7 +141,7 @@ public class CreateCustomFieldDefinitionHandlerTests
             new CustomFieldOption { Value = "sales", Label = "Sales" }
         ];
 
-        CreateCustomFieldDefinition command = new(
+        CreateCustomFieldDefinitionCommand command = new(
             EntityType: "Invoice",
             FieldKey: "dept_select",
             DisplayName: "Department",

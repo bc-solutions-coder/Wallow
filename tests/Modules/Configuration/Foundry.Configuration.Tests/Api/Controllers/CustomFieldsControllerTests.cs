@@ -1,5 +1,8 @@
 using Foundry.Configuration.Api.Controllers;
-using Foundry.Configuration.Application.Commands;
+using Foundry.Configuration.Application.Commands.CreateCustomFieldDefinition;
+using Foundry.Configuration.Application.Commands.DeactivateCustomFieldDefinition;
+using Foundry.Configuration.Application.Commands.ReorderCustomFields;
+using Foundry.Configuration.Application.Commands.UpdateCustomFieldDefinition;
 using Foundry.Configuration.Application.Contracts.DTOs;
 using Foundry.Configuration.Application.Queries;
 using Foundry.Shared.Kernel.CustomFields;
@@ -170,7 +173,7 @@ public class CustomFieldsControllerTests
             FieldType = CustomFieldType.Text
         };
         CustomFieldDefinitionDto dto = CreateDefinitionDto("Invoice", "custom_ref");
-        _bus.InvokeAsync<Result<CustomFieldDefinitionDto>>(Arg.Any<CreateCustomFieldDefinition>(), Arg.Any<CancellationToken>())
+        _bus.InvokeAsync<Result<CustomFieldDefinitionDto>>(Arg.Any<CreateCustomFieldDefinitionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success(dto));
 
         IActionResult result = await _controller.Create(request, CancellationToken.None);
@@ -200,13 +203,13 @@ public class CustomFieldsControllerTests
             Options = options
         };
         CustomFieldDefinitionDto dto = CreateDefinitionDto("Invoice", "priority");
-        _bus.InvokeAsync<Result<CustomFieldDefinitionDto>>(Arg.Any<CreateCustomFieldDefinition>(), Arg.Any<CancellationToken>())
+        _bus.InvokeAsync<Result<CustomFieldDefinitionDto>>(Arg.Any<CreateCustomFieldDefinitionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success(dto));
 
         await _controller.Create(request, CancellationToken.None);
 
         await _bus.Received(1).InvokeAsync<Result<CustomFieldDefinitionDto>>(
-            Arg.Is<CreateCustomFieldDefinition>(c =>
+            Arg.Is<CreateCustomFieldDefinitionCommand>(c =>
                 c.EntityType == "Invoice" &&
                 c.FieldKey == "priority" &&
                 c.DisplayName == "Priority" &&
@@ -228,7 +231,7 @@ public class CustomFieldsControllerTests
             FieldType = CustomFieldType.Text
         };
         CustomFieldDefinitionDto dto = CreateDefinitionDto("Invoice", "ref", definitionId);
-        _bus.InvokeAsync<Result<CustomFieldDefinitionDto>>(Arg.Any<CreateCustomFieldDefinition>(), Arg.Any<CancellationToken>())
+        _bus.InvokeAsync<Result<CustomFieldDefinitionDto>>(Arg.Any<CreateCustomFieldDefinitionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success(dto));
 
         IActionResult result = await _controller.Create(request, CancellationToken.None);
@@ -252,7 +255,7 @@ public class CustomFieldsControllerTests
             Description = "Updated Desc"
         };
         CustomFieldDefinitionDto dto = CreateDefinitionDto("Invoice", "ref", definitionId);
-        _bus.InvokeAsync<CustomFieldDefinitionDto>(Arg.Any<UpdateCustomFieldDefinition>(), Arg.Any<CancellationToken>())
+        _bus.InvokeAsync<CustomFieldDefinitionDto>(Arg.Any<UpdateCustomFieldDefinitionCommand>(), Arg.Any<CancellationToken>())
             .Returns(dto);
 
         ActionResult<CustomFieldDefinitionDto> result = await _controller.Update(definitionId, request, CancellationToken.None);
@@ -280,13 +283,13 @@ public class CustomFieldsControllerTests
             Options = options
         };
         CustomFieldDefinitionDto dto = CreateDefinitionDto("Invoice", "ref", definitionId);
-        _bus.InvokeAsync<CustomFieldDefinitionDto>(Arg.Any<UpdateCustomFieldDefinition>(), Arg.Any<CancellationToken>())
+        _bus.InvokeAsync<CustomFieldDefinitionDto>(Arg.Any<UpdateCustomFieldDefinitionCommand>(), Arg.Any<CancellationToken>())
             .Returns(dto);
 
         await _controller.Update(definitionId, request, CancellationToken.None);
 
         await _bus.Received(1).InvokeAsync<CustomFieldDefinitionDto>(
-            Arg.Is<UpdateCustomFieldDefinition>(c =>
+            Arg.Is<UpdateCustomFieldDefinitionCommand>(c =>
                 c.Id == definitionId &&
                 c.DisplayName == "Updated" &&
                 c.Description == "Desc" &&
@@ -303,7 +306,7 @@ public class CustomFieldsControllerTests
     public async Task Deactivate_WhenSuccess_Returns204NoContent()
     {
         Guid definitionId = Guid.NewGuid();
-        _bus.InvokeAsync(Arg.Any<DeactivateCustomFieldDefinition>(), Arg.Any<CancellationToken>())
+        _bus.InvokeAsync(Arg.Any<DeactivateCustomFieldDefinitionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
 
         ActionResult result = await _controller.Deactivate(definitionId, CancellationToken.None);
@@ -315,13 +318,13 @@ public class CustomFieldsControllerTests
     public async Task Deactivate_PassesCorrectIdToCommand()
     {
         Guid definitionId = Guid.NewGuid();
-        _bus.InvokeAsync(Arg.Any<DeactivateCustomFieldDefinition>(), Arg.Any<CancellationToken>())
+        _bus.InvokeAsync(Arg.Any<DeactivateCustomFieldDefinitionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
 
         await _controller.Deactivate(definitionId, CancellationToken.None);
 
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<DeactivateCustomFieldDefinition>(c => c.Id == definitionId),
+            Arg.Is<DeactivateCustomFieldDefinitionCommand>(c => c.Id == definitionId),
             Arg.Any<CancellationToken>());
     }
 
@@ -334,7 +337,7 @@ public class CustomFieldsControllerTests
     {
         List<Guid> fieldIds = new() { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
         ReorderFieldsRequest request = new() { FieldIds = fieldIds };
-        _bus.InvokeAsync(Arg.Any<ReorderCustomFields>(), Arg.Any<CancellationToken>())
+        _bus.InvokeAsync(Arg.Any<ReorderCustomFieldsCommand>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
 
         ActionResult result = await _controller.Reorder("Invoice", request, CancellationToken.None);
@@ -347,13 +350,13 @@ public class CustomFieldsControllerTests
     {
         List<Guid> fieldIds = new() { Guid.NewGuid(), Guid.NewGuid() };
         ReorderFieldsRequest request = new() { FieldIds = fieldIds };
-        _bus.InvokeAsync(Arg.Any<ReorderCustomFields>(), Arg.Any<CancellationToken>())
+        _bus.InvokeAsync(Arg.Any<ReorderCustomFieldsCommand>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
 
         await _controller.Reorder("Payment", request, CancellationToken.None);
 
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<ReorderCustomFields>(c =>
+            Arg.Is<ReorderCustomFieldsCommand>(c =>
                 c.EntityType == "Payment" &&
                 c.FieldIdsInOrder == fieldIds),
             Arg.Any<CancellationToken>());

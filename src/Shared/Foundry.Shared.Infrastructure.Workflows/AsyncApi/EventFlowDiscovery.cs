@@ -1,7 +1,7 @@
 using System.Reflection;
 using Foundry.Shared.Contracts;
 
-namespace Foundry.Shared.Infrastructure.AsyncApi;
+namespace Foundry.Shared.Infrastructure.Workflows.AsyncApi;
 
 public sealed record EventFlowInfo(
     Type EventType,

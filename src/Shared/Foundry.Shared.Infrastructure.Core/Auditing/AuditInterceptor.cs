@@ -56,7 +56,7 @@ public sealed partial class AuditInterceptor : SaveChangesInterceptor
         {
             using IServiceScope scope = _serviceProvider.CreateScope();
             IHttpContextAccessor? httpContextAccessor = scope.ServiceProvider.GetService<IHttpContextAccessor>();
-            userId = httpContextAccessor?.HttpContext?.User?.FindFirst("sub")?.Value;
+            userId = httpContextAccessor?.HttpContext?.User.FindFirst("sub")?.Value;
 
             ITenantContext? tenantContext = scope.ServiceProvider.GetService<ITenantContext>();
             if (tenantContext is { IsResolved: true })

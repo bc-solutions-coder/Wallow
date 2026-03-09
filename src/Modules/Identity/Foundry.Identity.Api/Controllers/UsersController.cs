@@ -54,9 +54,9 @@ public class UsersController : ControllerBase
         {
             string searchLower = search.ToLowerInvariant();
             members = members
-                .Where(u => (u.Email?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false)
-                          || (u.FirstName?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false)
-                          || (u.LastName?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false))
+                .Where(u => u.Email.Contains(searchLower, StringComparison.OrdinalIgnoreCase)
+                          || u.FirstName.Contains(searchLower, StringComparison.OrdinalIgnoreCase)
+                          || u.LastName.Contains(searchLower, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 

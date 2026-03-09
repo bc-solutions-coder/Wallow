@@ -857,10 +857,10 @@ public class KeycloakSsoServiceTests
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            string key = $"{request.Method}:{request.RequestUri?.AbsolutePath ?? request.RequestUri?.ToString() ?? ""}";
+            string key = $"{request.Method}:{request.RequestUri!.AbsolutePath}";
 
             // Check if it's a Keycloak admin API call (has /admin/ in path)
-            if (request.RequestUri?.AbsolutePath.Contains("/admin/") == true)
+            if (request.RequestUri.AbsolutePath.Contains("/admin/"))
             {
                 if (_keycloakRoutes.TryGetValue(key, out (HttpStatusCode Status, object? Content) route))
                 {

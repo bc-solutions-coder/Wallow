@@ -4,7 +4,7 @@ using Foundry.Shared.Api.Extensions;
 using Foundry.Communications.Application.Announcements.Commands.CreateChangelogEntry;
 using Foundry.Communications.Application.Announcements.Commands.PublishChangelogEntry;
 using Foundry.Communications.Application.Announcements.DTOs;
-using Foundry.Shared.Infrastructure.Services;
+using Foundry.Shared.Infrastructure.Core.Services;
 using Foundry.Shared.Kernel.Results;
 using Foundry.Shared.Kernel.Identity.Authorization;
 using Microsoft.AspNetCore.Http;

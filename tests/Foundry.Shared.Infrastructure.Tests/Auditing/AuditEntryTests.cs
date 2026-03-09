@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Foundry.Shared.Infrastructure.Auditing;
+using Foundry.Shared.Infrastructure.Core.Auditing;
 
 namespace Foundry.Shared.Infrastructure.Tests.Auditing;
 

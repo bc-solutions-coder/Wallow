@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
 
-namespace Foundry.Shared.Infrastructure.AsyncApi;
+namespace Foundry.Shared.Infrastructure.Workflows.AsyncApi;
 
 public sealed class AsyncApiDocumentGenerator
 {

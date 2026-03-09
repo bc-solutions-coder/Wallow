@@ -1,8 +1,8 @@
 using FluentValidation;
 
-namespace Foundry.Configuration.Application.Commands;
+namespace Foundry.Configuration.Application.Commands.DeactivateCustomFieldDefinition;
 
-public sealed class DeactivateCustomFieldDefinitionValidator : AbstractValidator<DeactivateCustomFieldDefinition>
+public sealed class DeactivateCustomFieldDefinitionValidator : AbstractValidator<DeactivateCustomFieldDefinitionCommand>
 {
     public DeactivateCustomFieldDefinitionValidator()
     {

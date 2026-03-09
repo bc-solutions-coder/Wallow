@@ -2,7 +2,7 @@ using System.Reflection;
 using Foundry.Shared.Contracts.Billing.Events;
 using Foundry.Shared.Contracts.TestSales.Events;
 using Foundry.Shared.Handlers;
-using Foundry.Shared.Infrastructure.AsyncApi;
+using Foundry.Shared.Infrastructure.Workflows.AsyncApi;
 using Foundry.Shared.Infrastructure.Tests.AsyncApi.Stubs;
 using Foundry.TestBilling.Application.Sagas;
 using Foundry.TestBilling.Infrastructure.Consumers;

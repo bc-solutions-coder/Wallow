@@ -1,7 +1,7 @@
 using Elsa.Workflows;
 using Microsoft.Extensions.Logging;
 
-namespace Foundry.Shared.Infrastructure.Workflows;
+namespace Foundry.Shared.Infrastructure.Workflows.Workflows;
 
 /// <summary>
 /// Base class for module-specific workflow activities.

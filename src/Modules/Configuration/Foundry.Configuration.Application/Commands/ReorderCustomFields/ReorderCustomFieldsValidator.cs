@@ -1,8 +1,8 @@
 using FluentValidation;
 
-namespace Foundry.Configuration.Application.Commands;
+namespace Foundry.Configuration.Application.Commands.ReorderCustomFields;
 
-public sealed class ReorderCustomFieldsValidator : AbstractValidator<ReorderCustomFields>
+public sealed class ReorderCustomFieldsValidator : AbstractValidator<ReorderCustomFieldsCommand>
 {
     public ReorderCustomFieldsValidator()
     {

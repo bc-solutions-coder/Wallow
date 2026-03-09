@@ -1,4 +1,4 @@
-using Foundry.Shared.Infrastructure.Middleware;
+using Foundry.Shared.Infrastructure.Core.Middleware;
 using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
 using NSubstitute;

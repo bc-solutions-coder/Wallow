@@ -2,9 +2,9 @@ using Foundry.Configuration.Application.Contracts;
 using Foundry.Configuration.Domain.Entities;
 using Foundry.Configuration.Domain.Exceptions;
 
-namespace Foundry.Configuration.Application.Commands;
+namespace Foundry.Configuration.Application.Commands.ReorderCustomFields;
 
-public sealed record ReorderCustomFields(string EntityType, IReadOnlyList<Guid> FieldIdsInOrder);
+public sealed record ReorderCustomFieldsCommand(string EntityType, IReadOnlyList<Guid> FieldIdsInOrder);
 
 public sealed class ReorderCustomFieldsHandler
 {
@@ -18,7 +18,7 @@ public sealed class ReorderCustomFieldsHandler
     }
 
     public async Task Handle(
-        ReorderCustomFields command,
+        ReorderCustomFieldsCommand command,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<CustomFieldDefinition> definitions = await _repository.GetByEntityTypeAsync(

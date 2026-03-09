@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Foundry.Shared.Infrastructure.Auditing;
+namespace Foundry.Shared.Infrastructure.Core.Auditing;
 
 public static partial class AuditingExtensions
 {

@@ -2,7 +2,7 @@ using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Wolverine;
 
-namespace Foundry.Shared.Infrastructure.Middleware;
+namespace Foundry.Shared.Infrastructure.Core.Middleware;
 
 public static class TenantRestoringMiddleware
 {

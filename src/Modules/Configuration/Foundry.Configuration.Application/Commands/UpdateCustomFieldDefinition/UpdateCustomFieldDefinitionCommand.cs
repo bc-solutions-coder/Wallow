@@ -6,9 +6,9 @@ using Foundry.Configuration.Domain.Identity;
 using Foundry.Shared.Kernel.CustomFields;
 using Foundry.Shared.Kernel.Services;
 
-namespace Foundry.Configuration.Application.Commands;
+namespace Foundry.Configuration.Application.Commands.UpdateCustomFieldDefinition;
 
-public sealed record UpdateCustomFieldDefinition(
+public sealed record UpdateCustomFieldDefinitionCommand(
     Guid Id,
     string? DisplayName = null,
     string? Description = null,
@@ -35,7 +35,7 @@ public sealed class UpdateCustomFieldDefinitionHandler
     }
 
     public async Task<CustomFieldDefinitionDto> Handle(
-        UpdateCustomFieldDefinition command,
+        UpdateCustomFieldDefinitionCommand command,
         CancellationToken cancellationToken)
     {
         CustomFieldDefinition? definition = await _repository.GetByIdAsync(

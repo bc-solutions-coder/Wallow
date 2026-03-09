@@ -1,8 +1,8 @@
 using FluentValidation;
 
-namespace Foundry.Configuration.Application.Commands;
+namespace Foundry.Configuration.Application.Commands.UpdateCustomFieldDefinition;
 
-public sealed class UpdateCustomFieldDefinitionValidator : AbstractValidator<UpdateCustomFieldDefinition>
+public sealed class UpdateCustomFieldDefinitionValidator : AbstractValidator<UpdateCustomFieldDefinitionCommand>
 {
     public UpdateCustomFieldDefinitionValidator()
     {

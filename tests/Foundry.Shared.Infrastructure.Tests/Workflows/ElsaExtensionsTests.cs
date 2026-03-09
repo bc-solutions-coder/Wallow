@@ -1,4 +1,4 @@
-using Foundry.Shared.Infrastructure.Workflows;
+using Foundry.Shared.Infrastructure.Workflows.Workflows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

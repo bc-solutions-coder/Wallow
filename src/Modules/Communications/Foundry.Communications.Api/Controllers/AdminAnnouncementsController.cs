@@ -8,7 +8,7 @@ using Foundry.Communications.Application.Announcements.Commands.UpdateAnnounceme
 using Foundry.Communications.Application.Announcements.DTOs;
 using Foundry.Communications.Application.Announcements.Queries.GetAllAnnouncements;
 using Foundry.Communications.Domain.Announcements.Enums;
-using Foundry.Shared.Infrastructure.Services;
+using Foundry.Shared.Infrastructure.Core.Services;
 using Foundry.Shared.Kernel.Results;
 using Foundry.Shared.Kernel.Identity.Authorization;
 using Microsoft.AspNetCore.Http;

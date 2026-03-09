@@ -4,7 +4,7 @@ using Foundry.Communications.Application.Announcements.Commands.CreateChangelogE
 using Foundry.Communications.Application.Announcements.Commands.PublishChangelogEntry;
 using Foundry.Communications.Application.Announcements.DTOs;
 using Foundry.Communications.Domain.Announcements.Enums;
-using Foundry.Shared.Infrastructure.Services;
+using Foundry.Shared.Infrastructure.Core.Services;
 using Foundry.Shared.Kernel.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

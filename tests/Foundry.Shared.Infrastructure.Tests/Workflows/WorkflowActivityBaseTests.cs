@@ -5,7 +5,7 @@ using Elsa.Workflows;
 using Elsa.Workflows.Activities;
 using Elsa.Workflows.CommitStates;
 using Elsa.Workflows.Models;
-using Foundry.Shared.Infrastructure.Workflows;
+using Foundry.Shared.Infrastructure.Workflows.Workflows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;

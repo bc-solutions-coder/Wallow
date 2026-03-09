@@ -1,6 +1,6 @@
 using Foundry.Billing.Domain.Entities;
 using Foundry.Billing.Domain.Metering.Entities;
-using Foundry.Shared.Infrastructure.Persistence;
+using Foundry.Shared.Infrastructure.Core.Persistence;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 

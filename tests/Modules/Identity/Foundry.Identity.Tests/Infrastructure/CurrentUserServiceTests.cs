@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Foundry.Shared.Infrastructure.Services;
+using Foundry.Shared.Infrastructure.Core.Services;
 using Microsoft.AspNetCore.Http;
 
 namespace Foundry.Identity.Tests.Infrastructure;

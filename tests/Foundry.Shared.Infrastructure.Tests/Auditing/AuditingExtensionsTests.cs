@@ -1,4 +1,4 @@
-using Foundry.Shared.Infrastructure.Auditing;
+using Foundry.Shared.Infrastructure.Core.Auditing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

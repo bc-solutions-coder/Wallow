@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Foundry.Shared.Infrastructure.Migrations;
+namespace Foundry.Shared.Infrastructure.Core.Migrations;
 
 /// <inheritdoc />
 public partial class InitialAuditSchema : Migration

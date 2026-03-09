@@ -1,5 +1,8 @@
 using Asp.Versioning;
-using Foundry.Configuration.Application.Commands;
+using Foundry.Configuration.Application.Commands.CreateCustomFieldDefinition;
+using Foundry.Configuration.Application.Commands.DeactivateCustomFieldDefinition;
+using Foundry.Configuration.Application.Commands.ReorderCustomFields;
+using Foundry.Configuration.Application.Commands.UpdateCustomFieldDefinition;
 using Foundry.Configuration.Application.Contracts.DTOs;
 using Foundry.Configuration.Application.Queries;
 using Foundry.Shared.Api.Extensions;
@@ -95,7 +98,7 @@ public class CustomFieldsController : ControllerBase
         CreateCustomFieldRequest request,
         CancellationToken cancellationToken)
     {
-        CreateCustomFieldDefinition command = new CreateCustomFieldDefinition(
+        CreateCustomFieldDefinitionCommand command = new CreateCustomFieldDefinitionCommand(
             request.EntityType,
             request.FieldKey,
             request.DisplayName,
@@ -125,7 +128,7 @@ public class CustomFieldsController : ControllerBase
         UpdateCustomFieldRequest request,
         CancellationToken cancellationToken)
     {
-        UpdateCustomFieldDefinition command = new UpdateCustomFieldDefinition(
+        UpdateCustomFieldDefinitionCommand command = new UpdateCustomFieldDefinitionCommand(
             id,
             request.DisplayName,
             request.Description,
@@ -149,7 +152,7 @@ public class CustomFieldsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        await _bus.InvokeAsync(new DeactivateCustomFieldDefinition(id), cancellationToken);
+        await _bus.InvokeAsync(new DeactivateCustomFieldDefinitionCommand(id), cancellationToken);
         return NoContent();
     }
 
@@ -165,7 +168,7 @@ public class CustomFieldsController : ControllerBase
         CancellationToken cancellationToken)
     {
         await _bus.InvokeAsync(
-            new ReorderCustomFields(entityType, request.FieldIds),
+            new ReorderCustomFieldsCommand(entityType, request.FieldIds),
             cancellationToken);
         return NoContent();
     }

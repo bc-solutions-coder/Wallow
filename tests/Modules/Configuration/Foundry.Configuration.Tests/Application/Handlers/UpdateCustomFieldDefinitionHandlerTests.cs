@@ -1,4 +1,4 @@
-using Foundry.Configuration.Application.Commands;
+using Foundry.Configuration.Application.Commands.UpdateCustomFieldDefinition;
 using Foundry.Configuration.Application.Contracts;
 using Foundry.Configuration.Application.Contracts.DTOs;
 using Foundry.Configuration.Domain.Entities;
@@ -38,7 +38,7 @@ public class UpdateCustomFieldDefinitionHandlerTests
         _repository.GetByIdAsync(Arg.Any<CustomFieldDefinitionId>(), Arg.Any<CancellationToken>())
             .Returns(definition);
 
-        UpdateCustomFieldDefinition command = new(Id: id, DisplayName: "Updated Name");
+        UpdateCustomFieldDefinitionCommand command = new(Id: id, DisplayName: "Updated Name");
 
         CustomFieldDefinitionDto result = await _handler.Handle(command, CancellationToken.None);
 
@@ -55,7 +55,7 @@ public class UpdateCustomFieldDefinitionHandlerTests
         _repository.GetByIdAsync(Arg.Any<CustomFieldDefinitionId>(), Arg.Any<CancellationToken>())
             .Returns(definition);
 
-        UpdateCustomFieldDefinition command = new(Id: definition.Id.Value, Description: "New description");
+        UpdateCustomFieldDefinitionCommand command = new(Id: definition.Id.Value, Description: "New description");
 
         CustomFieldDefinitionDto result = await _handler.Handle(command, CancellationToken.None);
 
@@ -70,7 +70,7 @@ public class UpdateCustomFieldDefinitionHandlerTests
         _repository.GetByIdAsync(Arg.Any<CustomFieldDefinitionId>(), Arg.Any<CancellationToken>())
             .Returns(definition);
 
-        UpdateCustomFieldDefinition command = new(Id: definition.Id.Value, IsRequired: true);
+        UpdateCustomFieldDefinitionCommand command = new(Id: definition.Id.Value, IsRequired: true);
 
         CustomFieldDefinitionDto result = await _handler.Handle(command, CancellationToken.None);
 
@@ -85,7 +85,7 @@ public class UpdateCustomFieldDefinitionHandlerTests
         _repository.GetByIdAsync(Arg.Any<CustomFieldDefinitionId>(), Arg.Any<CancellationToken>())
             .Returns(definition);
 
-        UpdateCustomFieldDefinition command = new(Id: definition.Id.Value, DisplayOrder: 5);
+        UpdateCustomFieldDefinitionCommand command = new(Id: definition.Id.Value, DisplayOrder: 5);
 
         CustomFieldDefinitionDto result = await _handler.Handle(command, CancellationToken.None);
 
@@ -101,7 +101,7 @@ public class UpdateCustomFieldDefinitionHandlerTests
             .Returns(definition);
 
         FieldValidationRules rules = new() { MaxLength = 100 };
-        UpdateCustomFieldDefinition command = new(Id: definition.Id.Value, ValidationRules: rules);
+        UpdateCustomFieldDefinitionCommand command = new(Id: definition.Id.Value, ValidationRules: rules);
 
         CustomFieldDefinitionDto result = await _handler.Handle(command, CancellationToken.None);
 
@@ -124,7 +124,7 @@ public class UpdateCustomFieldDefinitionHandlerTests
             new CustomFieldOption { Value = "a", Label = "Option A" },
             new CustomFieldOption { Value = "b", Label = "Option B" }
         ];
-        UpdateCustomFieldDefinition command = new(Id: definition.Id.Value, Options: options);
+        UpdateCustomFieldDefinitionCommand command = new(Id: definition.Id.Value, Options: options);
 
         CustomFieldDefinitionDto result = await _handler.Handle(command, CancellationToken.None);
 
@@ -137,7 +137,7 @@ public class UpdateCustomFieldDefinitionHandlerTests
         _repository.GetByIdAsync(Arg.Any<CustomFieldDefinitionId>(), Arg.Any<CancellationToken>())
             .Returns((CustomFieldDefinition?)null);
 
-        UpdateCustomFieldDefinition command = new(Id: Guid.NewGuid(), DisplayName: "Test");
+        UpdateCustomFieldDefinitionCommand command = new(Id: Guid.NewGuid(), DisplayName: "Test");
 
         Func<Task> act = () => _handler.Handle(command, CancellationToken.None);
 
@@ -154,7 +154,7 @@ public class UpdateCustomFieldDefinitionHandlerTests
         _repository.GetByIdAsync(Arg.Any<CustomFieldDefinitionId>(), Arg.Any<CancellationToken>())
             .Returns(definition);
 
-        UpdateCustomFieldDefinition command = new(
+        UpdateCustomFieldDefinitionCommand command = new(
             Id: definition.Id.Value,
             DisplayName: "New Name",
             Description: "New Desc",

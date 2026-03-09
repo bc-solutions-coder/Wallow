@@ -1,5 +1,5 @@
 using Elsa.Workflows;
-using Foundry.Shared.Infrastructure.Workflows;
+using Foundry.Shared.Infrastructure.Workflows.Workflows;
 
 namespace Foundry.Billing.Infrastructure.Workflows;
 

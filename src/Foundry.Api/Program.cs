@@ -37,6 +37,7 @@ using Wolverine.EntityFrameworkCore;
 using Wolverine.FluentValidation;
 using Wolverine.Postgresql;
 using Wolverine.RabbitMQ;
+using Microsoft.FeatureManagement;
 using Wolverine.RabbitMQ.Internal;
 
 // Note: Using CreateLogger() instead of CreateBootstrapLogger() to support
@@ -290,6 +291,7 @@ try
     builder.Services.AddFoundryWorkflows(builder.Configuration, builder.Environment);
     builder.Services.AddScoped<SystemHeartbeatJob>();
     builder.Services.AddFoundryRateLimiting();
+    builder.Services.AddFeatureManagement();
 
     WebApplication app = builder.Build();
 

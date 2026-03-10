@@ -53,3 +53,7 @@ docker/.env
 .qodana/
 .qodana-cache/
 .qodana-results/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db

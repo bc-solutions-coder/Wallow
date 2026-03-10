@@ -75,11 +75,15 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
             roles = new[] { "admin" };
         }
 
+        string tenantId = Request.Headers.TryGetValue("X-Test-Tenant-Id", out StringValues tenantHeader)
+            ? tenantHeader.ToString()
+            : TestConstants.TestOrgId.ToString();
+
         List<Claim> claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId),
             new(ClaimTypes.Email, $"{userId}@test.com"),
-            new("organization", TestConstants.TestOrgId.ToString()),
+            new("organization", tenantId),
         };
 
         foreach (string role in roles)

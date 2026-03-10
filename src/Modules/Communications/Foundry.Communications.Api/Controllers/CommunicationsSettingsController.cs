@@ -8,6 +8,7 @@ using Foundry.Shared.Kernel.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Foundry.Communications.Api.Controllers;
 
@@ -18,8 +19,8 @@ namespace Foundry.Communications.Api.Controllers;
 [Tags("Communications Settings")]
 [Produces("application/json")]
 public class CommunicationsSettingsController(
-    ISettingsService settingsService,
-    ISettingRegistry settingRegistry,
+    [FromKeyedServices("communications")] ISettingsService settingsService,
+    [FromKeyedServices("communications")] ISettingRegistry settingRegistry,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService) : ControllerBase
 {

@@ -29,7 +29,7 @@ public static class StorageInfrastructureExtensions
     {
         services.Configure<PresignedUrlOptions>(configuration.GetSection(PresignedUrlOptions.SectionName));
         services.AddStoragePersistence(configuration);
-        services.AddSettings<StorageDbContext, StorageSettingKeys>();
+        services.AddSettings<StorageDbContext, StorageSettingKeys>("storage");
         services.AddStorageProvider(configuration);
         services.AddScoped<IFileScanner, ClamAvFileScanner>();
         services.AddClamAvHealthCheck(configuration);

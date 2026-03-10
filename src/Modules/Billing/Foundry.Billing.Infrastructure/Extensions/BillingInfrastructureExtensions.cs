@@ -22,7 +22,7 @@ public static class BillingInfrastructureExtensions
         this IServiceCollection services, IConfiguration configuration)
     {
         services.AddBillingPersistence(configuration);
-        services.AddSettings<BillingDbContext, BillingSettingKeys>();
+        services.AddSettings<BillingDbContext, BillingSettingKeys>("billing");
         return services;
     }
 

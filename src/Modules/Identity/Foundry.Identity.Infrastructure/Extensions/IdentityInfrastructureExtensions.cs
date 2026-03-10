@@ -35,7 +35,7 @@ public static class IdentityInfrastructureExtensions
         services.AddIdentityAuthorization();
         services.AddMultiTenancy();
         services.AddIdentityPersistence(configuration);
-        services.AddSettings<IdentityDbContext, IdentitySettingKeys>();
+        services.AddSettings<IdentityDbContext, IdentitySettingKeys>("identity");
         services.AddKeycloakAdmin(configuration);
 
         return services;

@@ -37,7 +37,7 @@ public static partial class CommunicationsModuleExtensions
         services
             .AddCommunicationsPersistence(configuration)
             .AddCommunicationsServices(configuration);
-        services.AddSettings<CommunicationsDbContext, CommunicationsSettingKeys>();
+        services.AddSettings<CommunicationsDbContext, CommunicationsSettingKeys>("communications");
 
         return services;
     }

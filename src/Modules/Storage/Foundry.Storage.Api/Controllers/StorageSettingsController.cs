@@ -8,6 +8,7 @@ using Foundry.Shared.Kernel.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Foundry.Storage.Api.Controllers;
 
@@ -18,8 +19,8 @@ namespace Foundry.Storage.Api.Controllers;
 [Tags("Storage Settings")]
 [Produces("application/json")]
 public class StorageSettingsController(
-    ISettingsService settingsService,
-    ISettingRegistry settingRegistry,
+    [FromKeyedServices("storage")] ISettingsService settingsService,
+    [FromKeyedServices("storage")] ISettingRegistry settingRegistry,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService) : ControllerBase
 {

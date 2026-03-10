@@ -8,6 +8,7 @@ using Foundry.Tests.Common.Fakes;
 using Foundry.Tests.Common.Helpers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -155,11 +156,20 @@ public class FoundryApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddAuthentication("Test")
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", _ => { });
 
-            services.AddScoped<ITenantContext>(_ => new TenantContext
+            services.AddScoped<ITenantContext>(sp =>
             {
-                TenantId = TenantId.Create(TestConstants.TestTenantId),
-                TenantName = "Test Tenant",
-                IsResolved = true
+                IHttpContextAccessor httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+                string? tenantHeader = httpContextAccessor.HttpContext?.Request.Headers["X-Test-Tenant-Id"].FirstOrDefault();
+                Guid tenantId = !string.IsNullOrEmpty(tenantHeader) && Guid.TryParse(tenantHeader, out Guid parsed)
+                    ? parsed
+                    : TestConstants.TestTenantId;
+
+                return new TenantContext
+                {
+                    TenantId = TenantId.Create(tenantId),
+                    TenantName = "Test Tenant",
+                    IsResolved = true
+                };
             });
 
             services.AddSingleton<IKeycloakAdminService, FakeKeycloakAdminService>();

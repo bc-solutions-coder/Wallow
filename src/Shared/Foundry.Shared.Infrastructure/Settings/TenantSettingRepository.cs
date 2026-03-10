@@ -40,13 +40,17 @@ public sealed class TenantSettingRepository<TDbContext>(TDbContext context)
         }
         else
         {
-            int currentCount = await context.Set<TenantSettingEntity>()
-                .CountAsync(e => e.TenantId == entity.TenantId, cancellationToken);
-
-            if (currentCount >= SettingKeyValidator.MaxCustomKeysPerTenant)
+            if (SettingKeyValidator.IsCustomKey(entity.SettingKey))
             {
-                throw new InvalidOperationException(
-                    $"Tenant has reached the maximum of {SettingKeyValidator.MaxCustomKeysPerTenant} setting keys.");
+                int currentCount = await context.Set<TenantSettingEntity>()
+                    .CountAsync(e => e.TenantId == entity.TenantId
+                                     && e.SettingKey.StartsWith(SettingKeyValidator.CustomPrefix), cancellationToken);
+
+                if (currentCount >= SettingKeyValidator.MaxCustomKeysPerTenant)
+                {
+                    throw new InvalidOperationException(
+                        $"Tenant has reached the maximum of {SettingKeyValidator.MaxCustomKeysPerTenant} setting keys.");
+                }
             }
 
             context.Set<TenantSettingEntity>().Add(entity);

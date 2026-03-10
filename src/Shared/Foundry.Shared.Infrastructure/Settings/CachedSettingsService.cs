@@ -87,6 +87,8 @@ public sealed class CachedSettingsService<TDbContext>(
         }
 
         await InvalidateTenantCacheAsync(tenantId, ct);
+        // Tenant setting changes affect merged user configs, so invalidate the calling user's cache too
+        await InvalidateUserCacheAsync(tenantId, updatedBy, ct);
     }
 
     public async Task UpdateUserSettingsAsync(
@@ -118,6 +120,7 @@ public sealed class CachedSettingsService<TDbContext>(
         }
 
         await InvalidateTenantCacheAsync(tenantId, ct);
+        await InvalidateUserCacheAsync(tenantId, deletedBy, ct);
     }
 
     public async Task DeleteUserSettingsAsync(

@@ -49,6 +49,12 @@ public abstract class FoundryIntegrationTestBase : IAsyncLifetime
         Client.DefaultRequestHeaders.Add("X-Test-Roles", roles);
     }
 
+    protected void SetTestTenant(Guid tenantId)
+    {
+        Client.DefaultRequestHeaders.Remove("X-Test-Tenant-Id");
+        Client.DefaultRequestHeaders.Add("X-Test-Tenant-Id", tenantId.ToString("D"));
+    }
+
     private static Guid GenerateGuidFromString(string input)
     {
         byte[] hash = System.Security.Cryptography.SHA256.HashData(

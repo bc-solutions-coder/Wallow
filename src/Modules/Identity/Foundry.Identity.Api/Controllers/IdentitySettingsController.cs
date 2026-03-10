@@ -8,6 +8,7 @@ using Foundry.Shared.Kernel.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Foundry.Identity.Api.Controllers;
 
@@ -18,8 +19,8 @@ namespace Foundry.Identity.Api.Controllers;
 [Tags("Identity Settings")]
 [Produces("application/json")]
 public class IdentitySettingsController(
-    ISettingsService settingsService,
-    ISettingRegistry settingRegistry,
+    [FromKeyedServices("identity")] ISettingsService settingsService,
+    [FromKeyedServices("identity")] ISettingRegistry settingRegistry,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService) : ControllerBase
 {

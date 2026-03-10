@@ -8,6 +8,7 @@ using Foundry.Shared.Kernel.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Foundry.Billing.Api.Controllers;
 
@@ -18,8 +19,8 @@ namespace Foundry.Billing.Api.Controllers;
 [Tags("Billing Settings")]
 [Produces("application/json")]
 public class BillingSettingsController(
-    ISettingsService settingsService,
-    ISettingRegistry settingRegistry,
+    [FromKeyedServices("billing")] ISettingsService settingsService,
+    [FromKeyedServices("billing")] ISettingRegistry settingRegistry,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService) : ControllerBase
 {

@@ -7,6 +7,7 @@ using Foundry.Inquiries.Infrastructure.Extensions;
 using Foundry.Shared.Infrastructure.Plugins;
 using Foundry.Showcases.Infrastructure.Extensions;
 using Foundry.Storage.Infrastructure.Extensions;
+using Microsoft.FeatureManagement;
 
 namespace Foundry.Api;
 
@@ -20,28 +21,33 @@ internal static class FoundryModules
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        IConfigurationSection modules = configuration.GetSection("Foundry:Modules");
+        // Ensure IConfiguration and FeatureManagement are registered before building the temp provider.
+        // This makes AddFoundryModules self-contained (works even without prior DI setup in tests).
+        services.AddSingleton(configuration);
+        services.AddFeatureManagement();
+        ServiceProvider tempProvider = services.BuildServiceProvider();
+        IFeatureManager featureManager = tempProvider.GetRequiredService<IFeatureManager>();
 
         // ============================================================================
         // PLATFORM MODULES
         // Core infrastructure services used across all domain modules
         // ============================================================================
-        if (modules.GetValue("Identity", defaultValue: true))
+        if (featureManager.IsEnabledAsync("Modules.Identity").GetAwaiter().GetResult())
         {
             services.AddIdentityModule(configuration);
         }
 
-        if (modules.GetValue("Billing", defaultValue: true))
+        if (featureManager.IsEnabledAsync("Modules.Billing").GetAwaiter().GetResult())
         {
             services.AddBillingModule(configuration);
         }
 
-        if (modules.GetValue("Communications", defaultValue: true))
+        if (featureManager.IsEnabledAsync("Modules.Communications").GetAwaiter().GetResult())
         {
             services.AddCommunicationsModule(configuration);
         }
 
-        if (modules.GetValue("Storage", defaultValue: true))
+        if (featureManager.IsEnabledAsync("Modules.Storage").GetAwaiter().GetResult())
         {
             services.AddStorageModule(configuration);
         }
@@ -50,17 +56,17 @@ internal static class FoundryModules
         // FEATURE MODULES
         // Higher-level application features built on platform and domain modules
         // ============================================================================
-        if (modules.GetValue("Configuration", defaultValue: true))
+        if (featureManager.IsEnabledAsync("Modules.Configuration").GetAwaiter().GetResult())
         {
             services.AddConfigurationModule(configuration);
         }
 
-        if (modules.GetValue("Inquiries", defaultValue: true))
+        if (featureManager.IsEnabledAsync("Modules.Inquiries").GetAwaiter().GetResult())
         {
             services.AddInquiriesModule(configuration);
         }
 
-        if (modules.GetValue("Showcases", defaultValue: true))
+        if (featureManager.IsEnabledAsync("Modules.Showcases").GetAwaiter().GetResult())
         {
             services.AddShowcasesModule(configuration);
         }
@@ -76,28 +82,28 @@ internal static class FoundryModules
 
     public static async Task InitializeFoundryModulesAsync(this WebApplication app)
     {
-        IConfigurationSection modules = app.Configuration.GetSection("Foundry:Modules");
+        IFeatureManager featureManager = app.Services.GetRequiredService<IFeatureManager>();
 
         // ============================================================================
         // PLATFORM MODULES
         // Core infrastructure services - runs DB migrations
         // ============================================================================
-        if (modules.GetValue("Identity", defaultValue: true))
+        if (await featureManager.IsEnabledAsync("Modules.Identity"))
         {
             await app.InitializeIdentityModuleAsync();
         }
 
-        if (modules.GetValue("Billing", defaultValue: true))
+        if (await featureManager.IsEnabledAsync("Modules.Billing"))
         {
             await app.InitializeBillingModuleAsync();
         }
 
-        if (modules.GetValue("Communications", defaultValue: true))
+        if (await featureManager.IsEnabledAsync("Modules.Communications"))
         {
             await app.InitializeCommunicationsModuleAsync();
         }
 
-        if (modules.GetValue("Storage", defaultValue: true))
+        if (await featureManager.IsEnabledAsync("Modules.Storage"))
         {
             await app.InitializeStorageModuleAsync();
         }
@@ -106,17 +112,17 @@ internal static class FoundryModules
         // FEATURE MODULES
         // EF Core modules run migrations
         // ============================================================================
-        if (modules.GetValue("Configuration", defaultValue: true))
+        if (await featureManager.IsEnabledAsync("Modules.Configuration"))
         {
             await app.InitializeConfigurationModuleAsync();
         }
 
-        if (modules.GetValue("Inquiries", defaultValue: true))
+        if (await featureManager.IsEnabledAsync("Modules.Inquiries"))
         {
             await app.InitializeInquiriesModuleAsync();
         }
 
-        if (modules.GetValue("Showcases", defaultValue: true))
+        if (await featureManager.IsEnabledAsync("Modules.Showcases"))
         {
             await app.InitializeShowcasesModuleAsync();
         }

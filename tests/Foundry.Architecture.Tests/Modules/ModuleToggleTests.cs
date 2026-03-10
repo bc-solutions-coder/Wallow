@@ -18,7 +18,13 @@ public class ModuleToggleTests
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Foundry:Modules:Identity"] = "false",
+                ["FeatureManagement:Modules.Identity"] = "false",
+                ["FeatureManagement:Modules.Billing"] = "true",
+                ["FeatureManagement:Modules.Communications"] = "true",
+                ["FeatureManagement:Modules.Storage"] = "true",
+                ["FeatureManagement:Modules.Configuration"] = "true",
+                ["FeatureManagement:Modules.Inquiries"] = "true",
+                ["FeatureManagement:Modules.Showcases"] = "true",
                 ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test",
             })
             .Build();
@@ -33,12 +39,19 @@ public class ModuleToggleTests
     }
 
     [Fact]
-    public void NoModulesSection_ShouldRegister_AllModulesByDefault()
+    public void AllModulesEnabled_ShouldRegister_AllModules()
     {
         ServiceCollection services = new();
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["FeatureManagement:Modules.Identity"] = "true",
+                ["FeatureManagement:Modules.Billing"] = "true",
+                ["FeatureManagement:Modules.Communications"] = "true",
+                ["FeatureManagement:Modules.Storage"] = "true",
+                ["FeatureManagement:Modules.Configuration"] = "true",
+                ["FeatureManagement:Modules.Inquiries"] = "true",
+                ["FeatureManagement:Modules.Showcases"] = "true",
                 ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test",
             })
             .Build();

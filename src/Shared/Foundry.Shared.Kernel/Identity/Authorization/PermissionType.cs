@@ -71,6 +71,10 @@ public static class PermissionType
 
     public const string ChangelogManage = "ChangelogManage";
 
+    // Push notifications
+    public const string PushRead = "PushRead";
+    public const string PushConfigWrite = "PushConfigWrite";
+
     // Storage
     public const string StorageRead = "StorageRead";
     public const string StorageWrite = "StorageWrite";

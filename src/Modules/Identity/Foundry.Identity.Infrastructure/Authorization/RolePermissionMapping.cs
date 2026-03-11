@@ -58,6 +58,8 @@ public static class RolePermissionMapping
             PermissionType.ServiceAccountsRead,
             PermissionType.ServiceAccountsWrite,
             PermissionType.ServiceAccountsManage,
+            PermissionType.PushRead,
+            PermissionType.PushConfigWrite,
         ],
         ["manager"] =
         [

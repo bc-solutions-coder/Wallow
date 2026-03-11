@@ -1,6 +1,7 @@
 using Foundry.Communications.Application.Announcements.Interfaces;
 using Foundry.Communications.Application.Channels.Email.Interfaces;
 using Foundry.Communications.Application.Channels.InApp.Interfaces;
+using Foundry.Communications.Application.Channels.Push.Interfaces;
 using Foundry.Communications.Application.Channels.Sms.Interfaces;
 using Foundry.Communications.Application.Extensions;
 using Foundry.Communications.Application.Messaging.Interfaces;
@@ -81,6 +82,11 @@ public static partial class CommunicationsModuleExtensions
         services.AddScoped<IChangelogRepository, ChangelogRepository>();
         services.AddScoped<IAnnouncementDismissalRepository, AnnouncementDismissalRepository>();
 
+        // Push repositories
+        services.AddScoped<IDeviceRegistrationRepository, DeviceRegistrationRepository>();
+        services.AddScoped<ITenantPushConfigurationRepository, TenantPushConfigurationRepository>();
+        services.AddScoped<IPushMessageRepository, PushMessageRepository>();
+
         // Messaging repositories
         services.AddScoped<IConversationRepository, ConversationRepository>();
 
@@ -119,6 +125,9 @@ public static partial class CommunicationsModuleExtensions
         // InApp notification services
         services.AddScoped<INotificationService, SignalRNotificationService>();
 
+        // Preference checking
+        services.AddScoped<INotificationPreferenceChecker, NotificationPreferenceChecker>();
+
         // Background jobs
         services.AddScoped<RetryFailedEmailsJob>();
 
@@ -136,6 +145,12 @@ public static partial class CommunicationsModuleExtensions
         {
             services.AddScoped<ISmsProvider, NullSmsProvider>();
         }
+
+        // Push services
+        services.Configure<PushSettings>(configuration.GetSection("PushSettings"));
+        services.AddDataProtection();
+        services.AddSingleton<IPushCredentialEncryptor, PushCredentialEncryptor>();
+        services.AddScoped<IPushProviderFactory, PushProviderFactory>();
 
         return services;
     }

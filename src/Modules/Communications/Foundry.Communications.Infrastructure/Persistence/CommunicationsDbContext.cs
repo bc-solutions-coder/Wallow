@@ -1,4 +1,6 @@
 using Foundry.Communications.Domain.Announcements.Entities;
+using Foundry.Communications.Domain.Channels.Push;
+using Foundry.Communications.Domain.Channels.Push.Entities;
 using Foundry.Communications.Domain.Channels.Email.Entities;
 using Foundry.Communications.Domain.Channels.InApp.Entities;
 using Foundry.Communications.Domain.Channels.Sms.Entities;
@@ -37,6 +39,11 @@ public sealed class CommunicationsDbContext : TenantAwareDbContext<Communication
     public DbSet<AnnouncementDismissal> AnnouncementDismissals => Set<AnnouncementDismissal>();
     public DbSet<ChangelogEntry> ChangelogEntries => Set<ChangelogEntry>();
     public DbSet<ChangelogItem> ChangelogItems => Set<ChangelogItem>();
+
+    // Push
+    public DbSet<DeviceRegistration> DeviceRegistrations => Set<DeviceRegistration>();
+    public DbSet<TenantPushConfiguration> TenantPushConfigurations => Set<TenantPushConfiguration>();
+    public DbSet<PushMessage> PushMessages => Set<PushMessage>();
 
     // Settings
     public DbSet<TenantSettingEntity> TenantSettings => Set<TenantSettingEntity>();

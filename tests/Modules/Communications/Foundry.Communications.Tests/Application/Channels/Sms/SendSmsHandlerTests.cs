@@ -1,5 +1,6 @@
 using Foundry.Communications.Application.Channels.Sms.Commands.SendSms;
 using Foundry.Communications.Application.Channels.Sms.Interfaces;
+using Foundry.Communications.Application.Preferences.Interfaces;
 using Foundry.Communications.Domain.Channels.Sms.Entities;
 using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
@@ -23,7 +24,8 @@ public class SendSmsHandlerTests
         _smsProvider.SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new SmsDeliveryResult(true, "test-sid", null));
 
-        _handler = new SendSmsHandler(_repository, _smsProvider, tenantContext, TimeProvider.System);
+        INotificationPreferenceChecker preferenceChecker = Substitute.For<INotificationPreferenceChecker>();
+        _handler = new SendSmsHandler(_repository, _smsProvider, tenantContext, TimeProvider.System, preferenceChecker);
     }
 
     [Fact]

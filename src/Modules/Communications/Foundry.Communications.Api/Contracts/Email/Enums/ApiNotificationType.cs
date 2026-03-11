@@ -1,17 +1,13 @@
 namespace Foundry.Communications.Api.Contracts.Email.Enums;
 
-/// <summary>Type of email notification for API contracts.</summary>
 public enum ApiNotificationType
 {
-    /// <summary>Task assignment notification.</summary>
     TaskAssigned = 0,
-
-    /// <summary>Task completion notification.</summary>
     TaskCompleted = 1,
-
-    /// <summary>Billing invoice notification.</summary>
-    BillingInvoice = 2,
-
-    /// <summary>System notification.</summary>
-    SystemNotification = 3
+    TaskComment = 2,
+    SystemAlert = 3,
+    BillingInvoice = 4,
+    Mention = 5,
+    Announcement = 6,
+    SystemNotification = 7
 }

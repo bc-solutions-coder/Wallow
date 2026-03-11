@@ -1,6 +1,7 @@
 using Foundry.Communications.Application.Channels.Email.Commands.SendEmail;
 using Foundry.Communications.Application.Channels.Email.DTOs;
 using Foundry.Communications.Application.Channels.Email.Interfaces;
+using Foundry.Communications.Application.Preferences.Interfaces;
 using Foundry.Communications.Domain.Channels.Email.Entities;
 using Foundry.Communications.Domain.Channels.Email.Enums;
 using Foundry.Shared.Contracts.Communications.Email;
@@ -22,7 +23,8 @@ public class SendEmailHandlerTests
         _emailService = Substitute.For<IEmailService>();
         ITenantContext tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(TenantId.New());
-        _handler = new SendEmailHandler(_repository, _emailService, tenantContext, TimeProvider.System);
+        INotificationPreferenceChecker preferenceChecker = Substitute.For<INotificationPreferenceChecker>();
+        _handler = new SendEmailHandler(_repository, _emailService, tenantContext, TimeProvider.System, preferenceChecker);
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-# Phase 16: Infrastructure & Configuration
+# Phase 17: Infrastructure & Configuration
 
 **Scope:** `docker/`, `.github/`, `deploy/`, and root configuration files
 **Status:** Not Started
@@ -14,14 +14,14 @@
 
 | # | Status | File | Purpose | Key Config | Your Notes |
 |---|--------|------|---------|------------|------------|
-| 1 | [ ] | `Foundry.sln` | Visual Studio solution file defining all projects, their GUIDs, and build configurations (Debug/Release). | All project references and solution folders |
+| 1 | [ ] | `Foundry.slnx` | Visual Studio solution file (SLNX format) defining all projects, their GUIDs, and build configurations (Debug/Release). | All project references and solution folders |
 | 2 | [ ] | `Directory.Build.props` | MSBuild props applied to all projects. Sets .NET 10, C# latest, nullable, implicit usings, TreatWarningsAsErrors, code analysis, deterministic builds, central package management, and InternalsVisibleTo rules. | `TargetFramework=net10.0`, `Version=0.2.0` (release-please managed), `EnforceCodeStyleInBuild=true` |
 | 3 | [ ] | `Directory.Packages.props` | Central package version management (CPM). Defines all NuGet package versions in one place. Groups: ASP.NET Core, EF Core, health checks, messaging, identity, storage, observability, testing. | Version variables: `MicrosoftExtensionsVersion`, `EfCoreVersion`, `AspNetCoreVersion` |
 | 4 | [ ] | `Directory.Build.targets` | MSBuild targets that add code analyzers (Microsoft.CodeAnalysis.NetAnalyzers, StyleCop, Meziantou, Roslynator) to all non-test projects as development-only dependencies. | Analyzer packages with `PrivateAssets=all` |
 | 5 | [ ] | `global.json` | Pins .NET SDK version to `10.0.103` with `latestPatch` roll-forward policy. | SDK version pinning |
 | 6 | [ ] | `stylecop.json` | StyleCop Analyzers configuration: XML header disabled, documentation rules (document interfaces + exposed elements, skip internals/privates), require newline at EOF, system usings first. | `documentInternalElements: false`, `topLevelTypes: 1` |
 | 7 | [ ] | `.editorconfig` | EditorConfig defining code style: UTF-8, spaces, 4-space indent for C#, 2-space for XML project files, plus extensive .NET/C# coding conventions and analyzer severity overrides. | Indent styles, naming conventions, analyzer rules |
-| 8 | [ ] | `qodana.yaml` | JetBrains Qodana static analysis config. Uses `cdnet` linter on `Foundry.sln` with `failThreshold: 0` (any issue fails). | Zero-tolerance static analysis |
+| 8 | [ ] | `qodana.yaml` | JetBrains Qodana static analysis config. Uses `cdnet` linter on `Foundry.slnx` with `failThreshold: 0` (any issue fails). | Zero-tolerance static analysis |
 | 9 | [ ] | `release-please-config.json` | Release-please configuration for automated semver releases. Simple release type, updates `Version` in `Directory.Build.props` via XPath, generates `CHANGELOG.md`. | XPath: `//Project/PropertyGroup/Version` |
 | 10 | [ ] | `Dockerfile` | Multi-stage Docker build: restore (with layer caching via `--parents`), build, publish, final image based on `mcr.microsoft.com/dotnet/aspnet:10.0`. Includes health check. | Pinned base images with SHA digests, `HEALTHCHECK` on `/healthz` |
 | 11 | [ ] | `.dockerignore` | Excludes IDE files, build artifacts (`bin/`, `obj/`), Docker files, secrets, and documentation from Docker build context. | Standard .NET Docker exclusions |

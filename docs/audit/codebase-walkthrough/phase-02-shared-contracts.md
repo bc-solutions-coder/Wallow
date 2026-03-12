@@ -43,43 +43,38 @@
 | 10 | [ ] | `src/Shared/Foundry.Shared.Contracts/Billing/IRevenueReportService.cs` | Cross-module reporting interface for revenue aggregation by period | `GetRevenueAsync` returns `IReadOnlyList<RevenueReportRow>` with gross/net/refunds breakdown | None | |
 | 11 | [ ] | `src/Shared/Foundry.Shared.Contracts/Billing/ISubscriptionQueryService.cs` | Cross-module query for active subscription plan code by tenant | `GetActivePlanCodeAsync(Guid tenantId)` returns `string?` | None | |
 
-### Communications/Announcements/Events
+### Announcements/Events
 
 | # | Status | File | Purpose | Key Logic | Dependencies | Your Notes |
 |---|--------|------|---------|-----------|-------------|------------|
-| 12 | [ ] | `src/Shared/Foundry.Shared.Contracts/Communications/Announcements/Events/AnnouncementPublishedEvent.cs` | Integration event for published announcements with targeting info | Properties: AnnouncementId, TenantId, Title, Content, Type, Target, TargetValue, IsPinned | Contracts.IntegrationEvent | |
-
-### Communications/Email/Events
-
-| # | Status | File | Purpose | Key Logic | Dependencies | Your Notes |
-|---|--------|------|---------|-----------|-------------|------------|
-| 13 | [ ] | `src/Shared/Foundry.Shared.Contracts/Communications/Email/Events/EmailSentEvent.cs` | Integration event published after an email is successfully sent | Properties: EmailId, TenantId, ToAddress, Subject, TemplateName, SentAt | Contracts.IntegrationEvent | |
-| 14 | [ ] | `src/Shared/Foundry.Shared.Contracts/Communications/Email/Events/SendEmailRequestedEvent.cs` | Integration event requesting email delivery from any module | Properties: TenantId, To, From (optional), Subject, Body, SourceModule, CorrelationId | Contracts.IntegrationEvent | |
+| 12 | [ ] | `src/Shared/Foundry.Shared.Contracts/Announcements/Events/AnnouncementPublishedEvent.cs` | Integration event for published announcements with targeting info | Properties: AnnouncementId, TenantId, Title, Content, Type, Target, TargetValue, IsPinned, TargetUserIds | Contracts.IntegrationEvent | |
 
 ### Communications/Email
 
 | # | Status | File | Purpose | Key Logic | Dependencies | Your Notes |
 |---|--------|------|---------|-----------|-------------|------------|
-| 15 | [ ] | `src/Shared/Foundry.Shared.Contracts/Communications/Email/IEmailService.cs` | Cross-module email service interface with plain and attachment-based sending | `SendAsync`, `SendWithAttachmentAsync` methods | None | |
+| 13 | [ ] | `src/Shared/Foundry.Shared.Contracts/Communications/Email/IEmailService.cs` | Cross-module email service interface with plain and attachment-based sending | `SendAsync`, `SendWithAttachmentAsync` methods | None | |
 
-### Communications/Messaging/Events
-
-| # | Status | File | Purpose | Key Logic | Dependencies | Your Notes |
-|---|--------|------|---------|-----------|-------------|------------|
-| 16 | [ ] | `src/Shared/Foundry.Shared.Contracts/Communications/Messaging/Events/ConversationCreatedIntegrationEvent.cs` | Integration event for new conversation creation with participant list | Properties: ConversationId, ParticipantIds, CreatedAt, TenantId | Contracts.IntegrationEvent | |
-| 17 | [ ] | `src/Shared/Foundry.Shared.Contracts/Communications/Messaging/Events/MessageSentIntegrationEvent.cs` | Integration event for sent messages within conversations | Properties: ConversationId, MessageId, SenderId, Content, SentAt, TenantId | Contracts.IntegrationEvent | |
-
-### Communications/Notifications/Events
+### Delivery/Events
 
 | # | Status | File | Purpose | Key Logic | Dependencies | Your Notes |
 |---|--------|------|---------|-----------|-------------|------------|
-| 18 | [ ] | `src/Shared/Foundry.Shared.Contracts/Communications/Notifications/Events/NotificationCreatedEvent.cs` | Integration event for notification creation and delivery readiness | Properties: NotificationId, TenantId, UserId, Title, Type, CreatedAt | Contracts.IntegrationEvent | |
+| 14 | [ ] | `src/Shared/Foundry.Shared.Contracts/Delivery/Events/EmailSentEvent.cs` | Integration event published after an email is successfully sent | Properties: EmailId, TenantId, ToAddress, Subject, TemplateName, SentAt | Contracts.IntegrationEvent | |
+| 15 | [ ] | `src/Shared/Foundry.Shared.Contracts/Delivery/Events/PushSentEvent.cs` | Integration event published after a push notification is successfully sent | Properties: PushId, TenantId, RecipientId, SentAt | Contracts.IntegrationEvent | |
+| 16 | [ ] | `src/Shared/Foundry.Shared.Contracts/Delivery/Events/SmsSentEvent.cs` | Integration event published after an SMS is successfully sent | Properties: SmsId, TenantId, ToNumber, SentAt | Contracts.IntegrationEvent | |
 
-### Communications/Sms/Events
+### Messaging/Events
 
 | # | Status | File | Purpose | Key Logic | Dependencies | Your Notes |
 |---|--------|------|---------|-----------|-------------|------------|
-| 19 | [ ] | `src/Shared/Foundry.Shared.Contracts/Communications/Sms/Events/SendSmsRequestedEvent.cs` | Integration event requesting SMS delivery from any module | Properties: TenantId, To, Body, SourceModule, CorrelationId | Contracts.IntegrationEvent | |
+| 17 | [ ] | `src/Shared/Foundry.Shared.Contracts/Messaging/Events/ConversationCreatedIntegrationEvent.cs` | Integration event for new conversation creation with participant list | Properties: ConversationId, ParticipantIds, CreatedAt, TenantId | Contracts.IntegrationEvent | |
+| 18 | [ ] | `src/Shared/Foundry.Shared.Contracts/Messaging/Events/MessageSentIntegrationEvent.cs` | Integration event for sent messages within conversations | Properties: ConversationId, MessageId, SenderId, Content, SentAt, TenantId | Contracts.IntegrationEvent | |
+
+### Notifications/Events
+
+| # | Status | File | Purpose | Key Logic | Dependencies | Your Notes |
+|---|--------|------|---------|-----------|-------------|------------|
+| 19 | [ ] | `src/Shared/Foundry.Shared.Contracts/Notifications/Events/NotificationCreatedEvent.cs` | Integration event for notification creation and delivery readiness | Properties: NotificationId, TenantId, UserId, Title, Type, CreatedAt | Contracts.IntegrationEvent | |
 
 ### Identity/Events
 

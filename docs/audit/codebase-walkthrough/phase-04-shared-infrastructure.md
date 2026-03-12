@@ -2,7 +2,7 @@
 
 **Scope:** `src/Shared/Foundry.Shared.Infrastructure/` and `tests/Foundry.Shared.Infrastructure.Tests/`
 **Status:** Not Started
-**Files:** 0 source files (project exists but contains no custom .cs files), 30 test files
+**Files:** 11 source files, 30 test files
 
 ## How to Use This Document
 - Work through files top-to-bottom within each section
@@ -12,7 +12,21 @@
 
 ## Source Files
 
-The `Foundry.Shared.Infrastructure` project contains no custom source files (only auto-generated `obj/` files). It serves as a dependency aggregation project. All shared infrastructure implementations are in `Foundry.Shared.Infrastructure.Core`, `Foundry.Shared.Infrastructure.BackgroundJobs`, `Foundry.Shared.Infrastructure.Workflows`, and `Foundry.Shared.Infrastructure.Plugins`.
+### Settings
+
+| # | Status | File | Purpose | Key Logic | Dependencies | Your Notes |
+|---|--------|------|---------|-----------|-------------|------------|
+| 1 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/CachedSettingsService.cs` | Redis-cached ISettingsService implementation with 3-layer merge: default -> tenant -> user | `GetTenantSettingsAsync`, `GetUserSettingsAsync`, `GetConfigAsync`; 5-minute cache TTL; `UpdateTenantSettingsAsync`/`UpdateUserSettingsAsync`/`DeleteTenantSettingsAsync`/`DeleteUserSettingsAsync` | Kernel.Settings, TenantAwareDbContext, IDistributedCache | |
+| 2 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/ISettingRepository.cs` | Generic repository interfaces for tenant and user settings, keyed by DbContext type | `ITenantSettingRepository<TDbContext>` with `GetAllAsync`, `UpsertAsync`, `DeleteAsync`; `IUserSettingRepository<TDbContext>` same shape | Kernel.Identity | |
+| 3 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/SettingsCacheInvalidationHandlers.cs` | Wolverine message handlers that invalidate settings cache when settings change events are published | Handlers for settings change integration events; removes tenant/user cache keys | Kernel.Settings.SettingEvents, IDistributedCache | |
+| 4 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/SettingsModelBuilderExtensions.cs` | EF Core model builder extension to register tenant and user setting entity configurations | `ApplySettingsConfiguration` applies `TenantSettingEntityConfiguration` and `UserSettingEntityConfiguration` | Microsoft.EntityFrameworkCore | |
+| 5 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/SettingsServiceExtensions.cs` | DI registration extension wiring `CachedSettingsService` to `ISettingsService` with module-keyed repositories | `AddSettings<TDbContext, TRegistry>` registers keyed `ISettingRegistry`, scoped repositories, keyed `ISettingsService` | Kernel.Settings, Microsoft.Extensions.DependencyInjection | |
+| 6 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/TenantSettingEntity.cs` | EF Core entity for tenant-scoped settings stored per module and key | Properties: TenantId, ModuleName, SettingKey, Value; constructor enforces required fields | Kernel.Identity | |
+| 7 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/TenantSettingEntityConfiguration.cs` | EF Core fluent configuration for `TenantSettingEntity` with composite key and index | Primary key `(TenantId, ModuleName, SettingKey)`; table in `settings` schema | Microsoft.EntityFrameworkCore | |
+| 8 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/TenantSettingRepository.cs` | EF Core repository implementing `ITenantSettingRepository<TDbContext>` | `GetAllAsync` filters by TenantId + ModuleName; `UpsertAsync` add-or-update; `DeleteAsync` removes by key | TenantAwareDbContext, Kernel.Identity | |
+| 9 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/UserSettingEntity.cs` | EF Core entity for user-scoped settings stored per tenant, user, module, and key | Properties: TenantId, UserId, ModuleName, SettingKey, Value | Kernel.Identity | |
+| 10 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/UserSettingEntityConfiguration.cs` | EF Core fluent configuration for `UserSettingEntity` with composite key | Primary key `(TenantId, UserId, ModuleName, SettingKey)` | Microsoft.EntityFrameworkCore | |
+| 11 | [ ] | `src/Shared/Foundry.Shared.Infrastructure/Settings/UserSettingRepository.cs` | EF Core repository implementing `IUserSettingRepository<TDbContext>` | `GetAllAsync` filters by TenantId + UserId + ModuleName; `UpsertAsync`; `DeleteAsync` | TenantAwareDbContext, Kernel.Identity | |
 
 ## Test Files
 

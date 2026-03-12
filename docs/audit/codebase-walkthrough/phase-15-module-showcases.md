@@ -1,8 +1,8 @@
-# Phase 14: Showcases Module
+# Phase 15: Showcases Module
 
-**Scope:** Complete Showcases module - Domain, Application, Infrastructure, Api layers + Domain tests
+**Scope:** Complete Showcases module - Domain, Application, Infrastructure, Api layers + Domain tests + Application tests
 **Status:** Not Started
-**Files:** 26 source files, 1 test file
+**Files:** 26 source files, 10 test files
 
 ## How to Use This Document
 - Work through layers bottom-up: Domain -> Application -> Infrastructure -> Api -> Tests
@@ -146,3 +146,17 @@
 | # | Status | File | Purpose | What It Tests | Your Notes |
 |---|--------|------|---------|---------------|------------|
 | 27 | [ ] | `tests/Modules/Showcases/Showcases.Domain.Tests/ShowcaseTests.cs` | Unit tests for Showcase aggregate root | `ShowcaseCreateTests`: 8 tests covering Create with valid data (all fields set), single URL variants (demo-only, GitHub-only, video-only), empty/whitespace/null title failure, title exceeding 200 chars, no URLs failure, default display order. `ShowcaseUpdateTests`: 4 tests covering Update with valid data (all fields updated), empty title failure, long title failure, no URLs failure | |
+| 28 | [ ] | `tests/Modules/Showcases/Showcases.Domain.Tests/ShowcasePublishTests.cs` | Unit tests for Showcase publish behavior | Tests covering publish/unpublish state transitions on the Showcase aggregate | |
+| 29 | [ ] | `tests/Modules/Showcases/Showcases.Domain.Tests/ShowcaseUpdateEdgeCaseTests.cs` | Edge case tests for Showcase Update | Additional edge cases for `Update()` beyond the core happy/failure paths in ShowcaseTests | |
+
+### Application Tests
+
+| # | Status | File | Purpose | What It Tests | Your Notes |
+|---|--------|------|---------|---------------|------------|
+| 30 | [ ] | `tests/Modules/Showcases/Foundry.Showcases.Tests/Application/Commands/CreateShowcase/CreateShowcaseHandlerTests.cs` | Unit tests for CreateShowcaseHandler | Handler behavior: successful creation, domain failure propagation, repository interactions | |
+| 31 | [ ] | `tests/Modules/Showcases/Foundry.Showcases.Tests/Application/Commands/CreateShowcase/CreateShowcaseValidatorTests.cs` | Unit tests for CreateShowcaseValidator | FluentValidation rules: title required/length, URL presence, category validity | |
+| 32 | [ ] | `tests/Modules/Showcases/Foundry.Showcases.Tests/Application/Commands/DeleteShowcase/DeleteShowcaseHandlerTests.cs` | Unit tests for DeleteShowcaseHandler | Handler behavior: successful delete, not-found when showcase missing | |
+| 33 | [ ] | `tests/Modules/Showcases/Foundry.Showcases.Tests/Application/Commands/UpdateShowcase/UpdateShowcaseHandlerTests.cs` | Unit tests for UpdateShowcaseHandler | Handler behavior: successful update, not-found, domain failure propagation | |
+| 34 | [ ] | `tests/Modules/Showcases/Foundry.Showcases.Tests/Application/Commands/UpdateShowcase/UpdateShowcaseValidatorTests.cs` | Unit tests for UpdateShowcaseValidator | FluentValidation rules: ShowcaseId not empty, title required/length, URL presence, category validity | |
+| 35 | [ ] | `tests/Modules/Showcases/Foundry.Showcases.Tests/Application/Queries/GetShowcase/GetShowcaseHandlerTests.cs` | Unit tests for GetShowcaseHandler | Handler behavior: returns ShowcaseDto on success, not-found when missing | |
+| 36 | [ ] | `tests/Modules/Showcases/Foundry.Showcases.Tests/Application/Queries/GetShowcases/GetShowcasesHandlerTests.cs` | Unit tests for GetShowcasesHandler | Handler behavior: returns list, filters by category and tag, empty list when none match | |

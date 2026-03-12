@@ -81,13 +81,14 @@ For each file:
 | 7 | API Host | `phase-07-api-host.md` |
 | 8 | Identity Module | `phase-08-module-identity.md` |
 | 9 | Billing Module | `phase-09-module-billing.md` |
-| 10 | Communications Module | `phase-10-module-communications.md` |
-| 11 | Configuration Module | `phase-11-module-configuration.md` |
-| 12 | Storage Module | `phase-12-module-storage.md` |
-| 13 | Inquiries Module | `phase-13-module-inquiries.md` |
-| 14 | Showcases Module | `phase-14-module-showcases.md` |
-| 15 | Architecture Tests & Benchmarks | `phase-15-architecture-tests-benchmarks.md` |
-| 16 | Infrastructure & Config Files | `phase-16-infrastructure-config.md` |
+| 10 | Notifications Module | `phase-10-module-notifications.md` |
+| 11 | Messaging Module | `phase-11-module-messaging.md` |
+| 12 | Announcements Module | `phase-12-module-announcements.md` |
+| 13 | Storage Module | `phase-13-module-storage.md` |
+| 14 | Inquiries Module | `phase-14-module-inquiries.md` |
+| 15 | Showcases Module | `phase-15-module-showcases.md` |
+| 16 | Architecture Tests & Benchmarks | `phase-16-architecture-tests-benchmarks.md` |
+| 17 | Infrastructure & Config Files | `phase-17-infrastructure-config.md` |
 
 ## Key Reminders for Claude
 

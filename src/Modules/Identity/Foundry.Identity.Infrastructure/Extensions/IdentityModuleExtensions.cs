@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Foundry.Identity.Infrastructure.Extensions;
 
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public static partial class IdentityModuleExtensions
 {
     public static IServiceCollection AddIdentityModule(

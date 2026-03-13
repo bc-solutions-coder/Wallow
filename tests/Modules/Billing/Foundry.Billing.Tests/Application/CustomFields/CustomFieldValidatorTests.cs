@@ -8,11 +8,11 @@ using Foundry.Shared.Kernel.MultiTenancy;
 namespace Foundry.Billing.Tests.Application.CustomFields;
 
 /// <summary>
-/// A simple test entity implementing IHasCustomFields for validator tests.
+/// Fake Invoice entity for custom field validator tests.
+/// Must be named "Invoice" to match CustomFieldRegistry.
 /// </summary>
-internal sealed class TestEntity : IHasCustomFields
+internal sealed class Invoice : IHasCustomFields
 {
-    public string Name => "Invoice";
     public Dictionary<string, object>? CustomFields { get; private set; }
 
     public void SetCustomFields(Dictionary<string, object>? customFields)
@@ -40,7 +40,7 @@ public class CustomFieldValidatorTests
     public async Task ValidateAsync_WhenTenantNotResolved_ReturnsSuccess()
     {
         _tenantContext.IsResolved.Returns(false);
-        TestEntity entity = new();
+        Invoice entity = new();
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
 
@@ -52,7 +52,7 @@ public class CustomFieldValidatorTests
     {
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([]);
-        TestEntity entity = new();
+        Invoice entity = new();
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
 
@@ -66,7 +66,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields([]);
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -83,7 +83,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "required_field", "some value" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -98,7 +98,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields([]);
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -113,7 +113,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "text_field", "hello" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -128,7 +128,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "num_field", "not a number" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -145,7 +145,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "text_field", "ab" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -164,7 +164,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "status_field", "active" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -182,7 +182,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "status_field", "unknown_value" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -197,7 +197,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "email_field", "user@example.com" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -212,7 +212,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "email_field", "not-an-email" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -228,7 +228,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(null);
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -243,7 +243,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "website_field", "https://example.com" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -258,7 +258,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "website_field", "not-a-url" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -274,7 +274,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "zip_field", "12345" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);
@@ -290,7 +290,7 @@ public class CustomFieldValidatorTests
         _repository.GetByEntityTypeAsync(Arg.Any<string>(), false, Arg.Any<CancellationToken>())
             .Returns([definition]);
 
-        TestEntity entity = new();
+        Invoice entity = new();
         entity.SetCustomFields(new() { { "zip_field", "invalid" } });
 
         CustomFieldValidationResult result = await _validator.ValidateAsync(entity);

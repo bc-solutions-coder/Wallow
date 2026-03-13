@@ -2,9 +2,12 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace Foundry.Identity.Infrastructure.Persistence.Migrations;
 
 /// <inheritdoc />
+[ExcludeFromCodeCoverage]
 public partial class AddSettingsTables : Migration
 {
     /// <inheritdoc />

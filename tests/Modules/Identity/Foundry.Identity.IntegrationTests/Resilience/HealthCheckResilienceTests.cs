@@ -48,7 +48,7 @@ public class HealthCheckResilienceTests : IClassFixture<KeycloakResilienceTestFa
     {
         _factory.WireMock.Reset();
         _factory.WireMock
-            .Given(Request.Create().WithPath("*").UsingAnyMethod())
+            .Given(Request.Create().WithPath("/*").UsingAnyMethod())
             .RespondWith(Response.Create()
                 .WithStatusCode(500)
                 .WithBody("Internal Server Error"));
@@ -70,7 +70,7 @@ public class HealthCheckResilienceTests : IClassFixture<KeycloakResilienceTestFa
     {
         _factory.WireMock.Reset();
         _factory.WireMock
-            .Given(Request.Create().WithPath("*").UsingAnyMethod())
+            .Given(Request.Create().WithPath("/*").UsingAnyMethod())
             .RespondWith(Response.Create()
                 .WithStatusCode(200)
                 .WithBody("{}")
@@ -91,7 +91,7 @@ public class HealthCheckResilienceTests : IClassFixture<KeycloakResilienceTestFa
     {
         _factory.WireMock.Reset();
         _factory.WireMock
-            .Given(Request.Create().WithPath("*").UsingAnyMethod())
+            .Given(Request.Create().WithPath("/*").UsingAnyMethod())
             .RespondWith(Response.Create()
                 .WithStatusCode(200)
                 .WithHeader("Content-Type", "application/json")

@@ -116,7 +116,7 @@ public class KeycloakResilienceTestFactory : FoundryApiFactory
         // Stub OIDC discovery so startup auth configuration doesn't hang
         _wireMock!
             .Given(Request.Create()
-                .WithPath("*openid-configuration*")
+                .WithPath("/realms/foundry/.well-known/openid-configuration")
                 .UsingGet())
             .RespondWith(Response.Create()
                 .WithStatusCode(200)
@@ -136,7 +136,7 @@ public class KeycloakResilienceTestFactory : FoundryApiFactory
         // Stub JWKS endpoint
         _wireMock
             .Given(Request.Create()
-                .WithPath("*/protocol/openid-connect/certs")
+                .WithPath("/realms/foundry/protocol/openid-connect/certs")
                 .UsingGet())
             .RespondWith(Response.Create()
                 .WithStatusCode(200)

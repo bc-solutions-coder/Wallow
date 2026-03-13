@@ -359,7 +359,8 @@ public sealed class ClamAvFileScannerTests
     public async Task ScanAsync_WhenClean_WithLoggingEnabled_LogsScanResult()
     {
         using FakeClamAvServer server = new FakeClamAvServer("stream: OK");
-        ClamAvFileScanner scanner = CreateScanner(server.Port, enableLogging: true);
+        (ClamAvFileScanner scanner, ILoggerFactory loggerFactory) = CreateScannerWithLogging(server.Port);
+        using IDisposable __ = loggerFactory;
 
         byte[] content = "clean content"u8.ToArray();
         using MemoryStream stream = new MemoryStream(content);
@@ -374,7 +375,8 @@ public sealed class ClamAvFileScannerTests
     public async Task ScanAsync_WhenInfected_WithLoggingEnabled_LogsThreatDetected()
     {
         using FakeClamAvServer server = new FakeClamAvServer("stream: Eicar-Test FOUND");
-        ClamAvFileScanner scanner = CreateScanner(server.Port, enableLogging: true);
+        (ClamAvFileScanner scanner, ILoggerFactory loggerFactory) = CreateScannerWithLogging(server.Port);
+        using IDisposable __ = loggerFactory;
 
         byte[] content = "infected"u8.ToArray();
         using MemoryStream stream = new MemoryStream(content);
@@ -390,7 +392,8 @@ public sealed class ClamAvFileScannerTests
     public async Task ScanAsync_WhenUnexpectedResponse_WithLoggingEnabled_LogsUnexpectedResponse()
     {
         using FakeClamAvServer server = new FakeClamAvServer("UNKNOWN RESPONSE FORMAT");
-        ClamAvFileScanner scanner = CreateScanner(server.Port, enableLogging: true);
+        (ClamAvFileScanner scanner, ILoggerFactory loggerFactory) = CreateScannerWithLogging(server.Port);
+        using IDisposable __ = loggerFactory;
 
         byte[] content = "data"u8.ToArray();
         using MemoryStream stream = new MemoryStream(content);
@@ -453,22 +456,26 @@ public sealed class ClamAvFileScannerTests
         result.ThreatName.Should().Contain("Unknown threat");
     }
 
-    private static ClamAvFileScanner CreateScanner(int port, bool enableLogging = false)
+    private static ClamAvFileScanner CreateScanner(int port)
     {
         IOptions<StorageOptions> options = Options.Create(new StorageOptions
         {
             ClamAvHost = "127.0.0.1",
             ClamAvPort = port
         });
-
-        if (enableLogging)
-        {
-            using ILoggerFactory factory = LoggerFactory.Create(builder =>
-                builder.SetMinimumLevel(LogLevel.Debug));
-            return new ClamAvFileScanner(options, factory.CreateLogger<ClamAvFileScanner>());
-        }
-
         return new ClamAvFileScanner(options, NullLogger<ClamAvFileScanner>.Instance);
+    }
+
+    private static (ClamAvFileScanner Scanner, ILoggerFactory Factory) CreateScannerWithLogging(int port)
+    {
+        IOptions<StorageOptions> options = Options.Create(new StorageOptions
+        {
+            ClamAvHost = "127.0.0.1",
+            ClamAvPort = port
+        });
+        ILoggerFactory factory = LoggerFactory.Create(builder =>
+            builder.SetMinimumLevel(LogLevel.Trace).AddSimpleConsole());
+        return (new ClamAvFileScanner(options, factory.CreateLogger<ClamAvFileScanner>()), factory);
     }
 
     private sealed class FakeClamAvServer : IDisposable

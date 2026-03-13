@@ -3,7 +3,7 @@ using Foundry.Notifications.Application.Channels.Push.Interfaces;
 using Foundry.Notifications.Domain.Channels.Push.Entities;
 using Foundry.Notifications.Infrastructure.Services;
 using Foundry.Shared.Kernel.Identity;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace Foundry.Notifications.Tests.Infrastructure.Services;
 
@@ -19,11 +19,19 @@ public class FcmPushProviderTests
         "Test Body",
         TimeProvider.System);
 
+#pragma warning disable CA2000 // LoggerFactory disposal not needed in tests
+    private static ILogger<FcmPushProvider> CreateLogger()
+    {
+        return LoggerFactory.Create(b => b.AddSimpleConsole().SetMinimumLevel(LogLevel.Trace))
+            .CreateLogger<FcmPushProvider>();
+    }
+#pragma warning restore CA2000
+
 #pragma warning disable CA2000 // Provider takes ownership of HttpClient
     private static FcmPushProvider CreateProvider(HttpMessageHandler handler, string credential = Credential)
     {
         HttpClient httpClient = new(handler);
-        return new FcmPushProvider(httpClient, credential, NullLogger<FcmPushProvider>.Instance);
+        return new FcmPushProvider(httpClient, credential, CreateLogger());
     }
 #pragma warning restore CA2000
 
@@ -116,5 +124,50 @@ public class FcmPushProviderTests
 
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Contain("Timeout");
+    }
+
+    [Fact]
+    public async Task SendAsync_SetsJsonContentType()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.OK);
+        FcmPushProvider provider = CreateProvider(handler);
+
+        await provider.SendAsync(_message, DeviceToken);
+
+        handler.LastRequest!.Content!.Headers.ContentType!.MediaType.Should().Be("application/json");
+    }
+
+    [Fact]
+    public async Task SendAsync_PayloadContainsMessageWrapper()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.OK);
+        FcmPushProvider provider = CreateProvider(handler);
+
+        await provider.SendAsync(_message, DeviceToken);
+
+        handler.LastRequestBody.Should().Contain("\"message\":");
+        handler.LastRequestBody.Should().Contain("\"notification\":");
+    }
+
+    [Fact]
+    public async Task SendAsync_WhenNonSuccessStatusCode_ErrorMessageContainsStatusCodeAndResponseBody()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.NotFound, "{\"error\":\"NOT_FOUND\"}");
+        FcmPushProvider provider = CreateProvider(handler);
+
+        PushDeliveryResult result = await provider.SendAsync(_message, DeviceToken);
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("404");
+        result.ErrorMessage.Should().Contain("NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task SendAsync_ImplementsIPushProvider()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.OK);
+        FcmPushProvider provider = CreateProvider(handler);
+
+        provider.Should().BeAssignableTo<IPushProvider>();
     }
 }

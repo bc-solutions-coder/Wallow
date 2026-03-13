@@ -4,7 +4,7 @@ using Foundry.Notifications.Domain.Channels.Push.Entities;
 using Foundry.Notifications.Domain.Channels.Push.Enums;
 using Foundry.Notifications.Domain.Channels.Push.Identity;
 using Foundry.Shared.Kernel.Identity;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace Foundry.Notifications.Tests.Application.Commands.Push;
 
@@ -15,6 +15,7 @@ public class DeliverPushHandlerTests
     private readonly TimeProvider _timeProvider = Substitute.For<TimeProvider>();
     private readonly DeliverPushHandler _handler;
 
+#pragma warning disable CA2000 // LoggerFactory disposal not needed in tests
     public DeliverPushHandlerTests()
     {
         _timeProvider.GetUtcNow().Returns(DateTimeOffset.UtcNow);
@@ -22,8 +23,10 @@ public class DeliverPushHandlerTests
             _pushProviderFactory,
             _pushMessageRepository,
             _timeProvider,
-            NullLogger<DeliverPushHandler>.Instance);
+            LoggerFactory.Create(b => b.AddSimpleConsole().SetMinimumLevel(LogLevel.Trace))
+                .CreateLogger<DeliverPushHandler>());
     }
+#pragma warning restore CA2000
 
     [Fact]
     public async Task Handle_WhenPushMessageNotFound_LogsAndReturns()

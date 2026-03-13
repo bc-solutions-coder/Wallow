@@ -3,7 +3,7 @@ using Foundry.Notifications.Application.Channels.Push.Interfaces;
 using Foundry.Notifications.Domain.Channels.Push.Entities;
 using Foundry.Notifications.Infrastructure.Services;
 using Foundry.Shared.Kernel.Identity;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace Foundry.Notifications.Tests.Infrastructure.Services;
 
@@ -18,11 +18,19 @@ public class WebPushPushProviderTests
         "Test Body",
         TimeProvider.System);
 
+#pragma warning disable CA2000 // LoggerFactory disposal not needed in tests
+    private static ILogger<WebPushPushProvider> CreateLogger()
+    {
+        return LoggerFactory.Create(b => b.AddSimpleConsole().SetMinimumLevel(LogLevel.Trace))
+            .CreateLogger<WebPushPushProvider>();
+    }
+#pragma warning restore CA2000
+
 #pragma warning disable CA2000 // Provider takes ownership of HttpClient
     private static WebPushPushProvider CreateProvider(HttpMessageHandler handler)
     {
         HttpClient httpClient = new(handler);
-        return new WebPushPushProvider(httpClient, NullLogger<WebPushPushProvider>.Instance);
+        return new WebPushPushProvider(httpClient, CreateLogger());
     }
 #pragma warning restore CA2000
 
@@ -112,5 +120,50 @@ public class WebPushPushProviderTests
 
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Contain("timed out");
+    }
+
+    [Fact]
+    public async Task SendAsync_SetsJsonContentType()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.Created);
+        WebPushPushProvider provider = CreateProvider(handler);
+
+        await provider.SendAsync(_message, SubscriptionEndpoint);
+
+        handler.LastRequest!.Content!.Headers.ContentType!.MediaType.Should().Be("application/json");
+    }
+
+    [Fact]
+    public async Task SendAsync_PayloadContainsTitleAndBodyAtTopLevel()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.Created);
+        WebPushPushProvider provider = CreateProvider(handler);
+
+        await provider.SendAsync(_message, SubscriptionEndpoint);
+
+        handler.LastRequestBody.Should().Contain("\"title\":\"Test Title\"");
+        handler.LastRequestBody.Should().Contain("\"body\":\"Test Body\"");
+    }
+
+    [Fact]
+    public async Task SendAsync_WhenNonSuccessStatusCode_ErrorMessageContainsStatusCodeAndResponseBody()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.Unauthorized, "Invalid VAPID");
+        WebPushPushProvider provider = CreateProvider(handler);
+
+        PushDeliveryResult result = await provider.SendAsync(_message, SubscriptionEndpoint);
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("401");
+        result.ErrorMessage.Should().Contain("Invalid VAPID");
+    }
+
+    [Fact]
+    public async Task SendAsync_ImplementsIPushProvider()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.Created);
+        WebPushPushProvider provider = CreateProvider(handler);
+
+        provider.Should().BeAssignableTo<IPushProvider>();
     }
 }

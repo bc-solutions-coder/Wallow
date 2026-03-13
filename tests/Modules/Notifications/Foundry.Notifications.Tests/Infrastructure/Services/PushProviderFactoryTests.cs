@@ -122,6 +122,22 @@ public sealed class PushProviderFactoryTests : IDisposable
     }
 
     [Fact]
+    public void GetProvider_WhenEnabledWithUnknownPlatform_ReturnsLogPushProvider()
+    {
+        PushPlatform unknownPlatform = (PushPlatform)999;
+        TenantPushConfiguration config = TenantPushConfiguration.Create(
+            TenantId.New(), unknownPlatform, "encrypted", TimeProvider.System);
+
+        _configRepository
+            .GetByPlatformAsync(unknownPlatform, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<TenantPushConfiguration?>(config));
+
+        IPushProvider result = _sut.GetProvider(unknownPlatform);
+
+        result.Should().BeOfType<LogPushProvider>();
+    }
+
+    [Fact]
     public void GetProvider_WhenEnabled_CreatesNamedHttpClient()
     {
         TenantPushConfiguration config = TenantPushConfiguration.Create(

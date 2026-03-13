@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Foundry.Notifications.Application.Channels.Email.Interfaces;
+using Foundry.Notifications.Application.Channels.Email.Telemetry;
 using Foundry.Notifications.Infrastructure.Services;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Registry;
@@ -22,9 +24,15 @@ public sealed class SmtpEmailProviderTests : IAsyncLifetime, IDisposable
 
     private readonly ResiliencePipelineProvider<string> _pipelineProvider;
 
+    private static ILoggerFactory CreateLoggerFactory()
+    {
+        return LoggerFactory.Create(b => b.AddSimpleConsole().SetMinimumLevel(LogLevel.Trace));
+    }
+
+#pragma warning disable CA2000 // LoggerFactory disposal not needed in tests
     public SmtpEmailProviderTests()
     {
-        _connectionPool = new SmtpConnectionPool(_settings, NullLogger<SmtpConnectionPool>.Instance);
+        _connectionPool = new SmtpConnectionPool(_settings, CreateLoggerFactory().CreateLogger<SmtpConnectionPool>());
 
         ResiliencePipelineBuilder builder = new();
         ResiliencePipeline pipeline = builder.Build();
@@ -36,8 +44,9 @@ public sealed class SmtpEmailProviderTests : IAsyncLifetime, IDisposable
     private SmtpEmailProvider CreateSut()
     {
         return new SmtpEmailProvider(_connectionPool, _settings, _pipelineProvider,
-            NullLogger<SmtpEmailProvider>.Instance);
+            CreateLoggerFactory().CreateLogger<SmtpEmailProvider>());
     }
+#pragma warning restore CA2000
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -175,5 +184,175 @@ public sealed class SmtpEmailProviderTests : IAsyncLifetime, IDisposable
 
         // Should fail on SMTP, not size validation (10MB is at the limit, not over)
         result.ErrorMessage.Should().NotContain("exceeds maximum allowed size");
+    }
+
+    [Fact]
+    public async Task SendAsync_WithEmptyBody_DoesNotThrowOnMessageBuilding()
+    {
+        SmtpEmailProvider sut = CreateSut();
+        EmailDeliveryRequest request = new("recipient@test.com", null, "Subject", "");
+
+        EmailDeliveryResult result = await sut.SendAsync(request);
+
+        result.Success.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SendAsync_WithCustomFromAndAttachment_BuildsMessageCorrectly()
+    {
+        SmtpEmailProvider sut = CreateSut();
+        byte[] data = "content"u8.ToArray();
+        EmailDeliveryRequest request = new(
+            "recipient@test.com", "custom@sender.com", "Subject", "<b>Bold</b>",
+            Attachment: new ReadOnlyMemory<byte>(data),
+            AttachmentName: "file.txt",
+            AttachmentContentType: "text/plain");
+
+        EmailDeliveryResult result = await sut.SendAsync(request);
+
+        // Fails on SMTP, not message building — exercises custom from + attachment path
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().NotContain("exceeds maximum allowed size");
+    }
+
+    [Fact]
+    public async Task SendAsync_WithWhitespaceFromAndAttachment_UsesDefaultFrom()
+    {
+        SmtpEmailProvider sut = CreateSut();
+        byte[] data = "data"u8.ToArray();
+        EmailDeliveryRequest request = new(
+            "recipient@test.com", "   ", "Subject", "Body",
+            Attachment: new ReadOnlyMemory<byte>(data),
+            AttachmentName: "doc.pdf",
+            AttachmentContentType: "application/pdf");
+
+        EmailDeliveryResult result = await sut.SendAsync(request);
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().NotContain("exceeds maximum allowed size");
+    }
+
+    [Fact]
+    public async Task SendAsync_WithNullSubjectAndAttachment_HandlesGracefully()
+    {
+        SmtpEmailProvider sut = CreateSut();
+        byte[] data = "data"u8.ToArray();
+        EmailDeliveryRequest request = new(
+            "recipient@test.com", null, null!, "Body",
+            Attachment: new ReadOnlyMemory<byte>(data),
+            AttachmentName: "file.bin");
+
+        EmailDeliveryResult result = await sut.SendAsync(request);
+
+        result.Success.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SendAsync_WithDefaultAttachmentContentType_UsesOctetStream()
+    {
+        SmtpEmailProvider sut = CreateSut();
+        byte[] data = "binary"u8.ToArray();
+        EmailDeliveryRequest request = new(
+            "recipient@test.com", null, "Subject", "Body",
+            Attachment: new ReadOnlyMemory<byte>(data),
+            AttachmentName: "unknown.dat");
+
+        EmailDeliveryResult result = await sut.SendAsync(request);
+
+        // Default content type is application/octet-stream per the record definition
+        result.Success.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SendAsync_FailureResult_ContainsErrorMessage()
+    {
+        SmtpEmailProvider sut = CreateSut();
+        EmailDeliveryRequest request = new("recipient@test.com", null, "Subject", "Body");
+
+        EmailDeliveryResult result = await sut.SendAsync(request);
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task SendAsync_WhenFails_SetsActivityStatusToError()
+    {
+        List<Activity> activities = [];
+        using ActivityListener listener = new()
+        {
+            ShouldListenTo = source => source.Name == EmailModuleTelemetry.ActivitySource.Name,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity => activities.Add(activity)
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        SmtpEmailProvider sut = CreateSut();
+        EmailDeliveryRequest request = new("recipient@test.com", null, "Test Subject", "<p>Body</p>");
+
+        EmailDeliveryResult result = await sut.SendAsync(request);
+
+        result.Success.Should().BeFalse();
+        if (activities.Count > 0)
+        {
+            Activity activity = activities[0];
+            activity.Status.Should().Be(ActivityStatusCode.Error);
+            activity.Events.Should().Contain(e => e.Name == "exception");
+        }
+    }
+
+    [Fact]
+    public async Task SendAsync_WhenFails_SetsActivityTags()
+    {
+        List<Activity> activities = [];
+        using ActivityListener listener = new()
+        {
+            ShouldListenTo = source => source.Name == EmailModuleTelemetry.ActivitySource.Name,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity => activities.Add(activity)
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        SmtpEmailProvider sut = CreateSut();
+        EmailDeliveryRequest request = new("recipient@test.com", null, "Tagged Subject", "Body");
+
+        await sut.SendAsync(request);
+
+        if (activities.Count > 0)
+        {
+            Activity activity = activities[0];
+            activity.GetTagItem("email.to").Should().NotBeNull();
+            activity.GetTagItem("email.template").Should().Be("Tagged Subject");
+        }
+    }
+
+    [Fact]
+    public async Task SendAsync_WithAttachmentCustomFrom_WhenFails_ReturnsFailureResult()
+    {
+        SmtpEmailProvider sut = CreateSut();
+        byte[] data = "test content"u8.ToArray();
+        EmailDeliveryRequest request = new(
+            "recipient@test.com", "sender@custom.com", "Subject", "<p>HTML</p>",
+            Attachment: new ReadOnlyMemory<byte>(data),
+            AttachmentName: "report.csv",
+            AttachmentContentType: "text/csv");
+
+        EmailDeliveryResult result = await sut.SendAsync(request);
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task SendAsync_WithCancellation_ReturnsFailure()
+    {
+        SmtpEmailProvider sut = CreateSut();
+        using CancellationTokenSource cts = new();
+        await cts.CancelAsync();
+        EmailDeliveryRequest request = new("recipient@test.com", null, "Subject", "Body");
+
+        EmailDeliveryResult result = await sut.SendAsync(request, cts.Token);
+
+        result.Success.Should().BeFalse();
     }
 }

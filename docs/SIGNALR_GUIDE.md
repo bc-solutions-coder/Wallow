@@ -178,23 +178,29 @@ The Redis/Valkey backplane synchronizes messages across all server instances.
 // Redis connection (deferred for WebApplicationFactory compatibility)
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
-    var config = sp.GetRequiredService<IConfiguration>();
-    var connectionString = config.GetConnectionString("Redis")
+    IConfiguration config = sp.GetRequiredService<IConfiguration>();
+    string connectionString = config.GetConnectionString("Redis")
         ?? throw new InvalidOperationException("Redis connection string not configured");
     return ConnectionMultiplexer.Connect(connectionString);
 });
 
-// SignalR with Redis backplane
+// SignalR with Redis backplane — reuses the singleton IConnectionMultiplexer
 builder.Services.AddSignalR()
     .AddStackExchangeRedis(options =>
     {
         options.Configuration.ChannelPrefix = RedisChannel.Literal("Foundry");
-        options.ConnectionFactory = async writer =>
-        {
-            var connStr = configRef.GetConnectionString("Redis")!;
-            return await ConnectionMultiplexer.ConnectAsync(connStr, writer);
-        };
     });
+builder.Services.AddSingleton<IConfigureOptions<RedisOptions>>(sp =>
+{
+    IConnectionMultiplexer mux = sp.GetRequiredService<IConnectionMultiplexer>();
+    return new ConfigureNamedOptions<RedisOptions>(
+        Options.DefaultName,
+        options => options.ConnectionFactory = async _ =>
+        {
+            await Task.CompletedTask;
+            return mux;
+        });
+});
 ```
 
 ### Connection String Setup

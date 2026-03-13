@@ -575,7 +575,7 @@ All service account management endpoints require user authentication (not servic
 #### Create Service Account
 
 ```http
-POST /api/service-accounts
+POST /api/v1/identity/service-accounts
 Authorization: Bearer <user-token>
 Content-Type: application/json
 
@@ -602,7 +602,7 @@ Content-Type: application/json
 #### List Service Accounts
 
 ```http
-GET /api/service-accounts
+GET /api/v1/identity/service-accounts
 Authorization: Bearer <user-token>
 ```
 
@@ -638,7 +638,7 @@ Authorization: Bearer <user-token>
 #### Get Service Account Details
 
 ```http
-GET /api/service-accounts/{id}
+GET /api/v1/identity/service-accounts/{id}
 Authorization: Bearer <user-token>
 ```
 
@@ -659,7 +659,7 @@ Authorization: Bearer <user-token>
 #### Update Service Account Scopes
 
 ```http
-PUT /api/service-accounts/{id}/scopes
+PUT /api/v1/identity/service-accounts/{id}/scopes
 Authorization: Bearer <user-token>
 Content-Type: application/json
 
@@ -680,7 +680,7 @@ Content-Type: application/json
 #### Rotate Service Account Secret
 
 ```http
-POST /api/service-accounts/{id}/rotate-secret
+POST /api/v1/identity/service-accounts/{id}/rotate-secret
 Authorization: Bearer <user-token>
 ```
 
@@ -696,7 +696,7 @@ Authorization: Bearer <user-token>
 #### Delete Service Account
 
 ```http
-DELETE /api/service-accounts/{id}
+DELETE /api/v1/identity/service-accounts/{id}
 Authorization: Bearer <user-token>
 ```
 
@@ -707,7 +707,7 @@ Authorization: Bearer <user-token>
 #### Get Available Scopes
 
 ```http
-GET /api/scopes
+GET /api/v1/identity/scopes
 Authorization: Bearer <user-token>
 ```
 
@@ -765,12 +765,17 @@ Authorization: Bearer <user-token>
 | `users.read` | View user data | No |
 | `users.write` | Create and modify users | No |
 
-### Communications
+### Notifications
 
 | Scope | Description | Default |
 |-------|-------------|---------|
 | `notifications.read` | View notifications | No |
 | `notifications.write` | Send notifications | No |
+
+### Announcements
+
+| Scope | Description | Default |
+|-------|-------------|---------|
 | `announcements.read` | View announcements | No |
 | `announcements.write` | Manage announcements | No |
 
@@ -890,7 +895,7 @@ Rotate service account secrets every 90 days or when:
 
 ```bash
 # Automate rotation
-curl -X POST https://api.yourplatform.com/api/service-accounts/{id}/rotate-secret \
+curl -X POST https://api.yourplatform.com/api/v1/identity/service-accounts/{id}/rotate-secret \
   -H "Authorization: Bearer $USER_TOKEN"
 ```
 
@@ -1094,7 +1099,7 @@ Service account doesn't have required scope.
 **Solution:**
 Update scopes via portal or API:
 ```bash
-curl -X PUT https://api.yourplatform.com/api/service-accounts/{id}/scopes \
+curl -X PUT https://api.yourplatform.com/api/v1/identity/service-accounts/{id}/scopes \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"scopes": ["invoices.read", "invoices.write"]}'
@@ -1187,5 +1192,5 @@ Yes. All API requests (user or service account) count toward your tenant's rate 
 
 ---
 
-**Last Updated:** 2024-02-06
+**Last Updated:** 2026-03-13
 **API Version:** v1

@@ -27,27 +27,75 @@ builder.Host.UseWolverine(opts =>
 await FoundryModules.InitializeFoundryModulesAsync(app);
 ```
 
-**FoundryModules.cs** (`src/Foundry.Api/FoundryModules.cs`) explicitly lists all modules:
+**FoundryModules.cs** (`src/Foundry.Api/FoundryModules.cs`) explicitly lists all modules, gated by feature flags:
 ```csharp
-public static class FoundryModules
+internal static class FoundryModules
 {
     public static IServiceCollection AddFoundryModules(
-        this IServiceCollection services, IConfiguration configuration)
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
-        services.AddIdentityModule(configuration);
-        services.AddBillingModule(configuration);
-        services.AddCommunicationsModule(configuration);
-        services.AddStorageModule(configuration);
+        services.AddSingleton(configuration);
+        services.AddFeatureManagement();
+        ServiceProvider tempProvider = services.BuildServiceProvider();
+        IFeatureManager featureManager = tempProvider.GetRequiredService<IFeatureManager>();
+
+        if (featureManager.IsEnabledAsync("Modules.Identity").GetAwaiter().GetResult())
+            services.AddIdentityModule(configuration);
+
+        if (featureManager.IsEnabledAsync("Modules.Billing").GetAwaiter().GetResult())
+            services.AddBillingModule(configuration);
+
+        if (featureManager.IsEnabledAsync("Modules.Notifications").GetAwaiter().GetResult())
+            services.AddNotificationsModule(configuration);
+
+        if (featureManager.IsEnabledAsync("Modules.Messaging").GetAwaiter().GetResult())
+            services.AddMessagingModule(configuration);
+
+        if (featureManager.IsEnabledAsync("Modules.Announcements").GetAwaiter().GetResult())
+            services.AddAnnouncementsModule(configuration);
+
+        if (featureManager.IsEnabledAsync("Modules.Storage").GetAwaiter().GetResult())
+            services.AddStorageModule(configuration);
+
+        if (featureManager.IsEnabledAsync("Modules.Inquiries").GetAwaiter().GetResult())
+            services.AddInquiriesModule(configuration);
+
+        if (featureManager.IsEnabledAsync("Modules.Showcases").GetAwaiter().GetResult())
+            services.AddShowcasesModule(configuration);
+
         services.AddFoundryPlugins(configuration);
         return services;
     }
 
     public static async Task InitializeFoundryModulesAsync(this WebApplication app)
     {
-        await app.InitializeIdentityModuleAsync();
-        await app.InitializeBillingModuleAsync();
-        await app.InitializeCommunicationsModuleAsync();
-        await app.InitializeStorageModuleAsync();
+        IFeatureManager featureManager = app.Services.GetRequiredService<IFeatureManager>();
+
+        if (await featureManager.IsEnabledAsync("Modules.Identity"))
+            await app.InitializeIdentityModuleAsync();
+
+        if (await featureManager.IsEnabledAsync("Modules.Billing"))
+            await app.InitializeBillingModuleAsync();
+
+        if (await featureManager.IsEnabledAsync("Modules.Notifications"))
+            await app.InitializeNotificationsModuleAsync();
+
+        if (await featureManager.IsEnabledAsync("Modules.Messaging"))
+            await app.InitializeMessagingModuleAsync();
+
+        if (await featureManager.IsEnabledAsync("Modules.Announcements"))
+            await app.InitializeAnnouncementsModuleAsync();
+
+        if (await featureManager.IsEnabledAsync("Modules.Storage"))
+            await app.InitializeStorageModuleAsync();
+
+        if (await featureManager.IsEnabledAsync("Modules.Inquiries"))
+            await app.InitializeInquiriesModuleAsync();
+
+        if (await featureManager.IsEnabledAsync("Modules.Showcases"))
+            await app.InitializeShowcasesModuleAsync();
+
         await app.InitializeFoundryPluginsAsync();
     }
 }
@@ -79,8 +127,8 @@ public static class {Module}ModuleExtensions
     public static async Task<WebApplication> Initialize{Module}ModuleAsync(
         this WebApplication app)
     {
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<{Module}DbContext>();
+        using IServiceScope scope = app.Services.CreateScope();
+        {Module}DbContext db = scope.ServiceProvider.GetRequiredService<{Module}DbContext>();
         await db.Database.MigrateAsync();
         return app;
     }
@@ -127,7 +175,7 @@ Wolverine's `UseConventionalRouting()` automatically creates queues and exchange
 
 ## SMS Channel Patterns
 
-The Communications module provides a reusable SMS channel at `src/Modules/Communications/Foundry.Communications.Domain/Channels/Sms/`. Use this as the canonical reference when adding SMS capabilities.
+The Notifications module provides a reusable SMS channel at `src/Modules/Notifications/Foundry.Notifications.Domain/Channels/Sms/`. Use this as the canonical reference when adding SMS capabilities.
 
 **Domain layer** (`Domain/Channels/Sms/`):
 
@@ -142,7 +190,7 @@ The Communications module provides a reusable SMS channel at `src/Modules/Commun
 - `SendSmsCommand` / `SendSmsHandler` -- Internal command that creates the `SmsMessage` aggregate, calls `ISmsProvider.SendAsync()`, and updates status.
 - `SendSmsRequestedEventHandler` -- Consumes the cross-module `SendSmsRequestedEvent` from `Shared.Contracts` and dispatches `SendSmsCommand` via Wolverine's `IMessageBus`.
 
-**Cross-module triggering via Shared.Contracts** (`Shared.Contracts/Communications/Sms/Events/`):
+**Cross-module triggering via Shared.Contracts** (`Shared.Contracts/Notifications/Sms/Events/`):
 
 Other modules publish `SendSmsRequestedEvent` to request SMS delivery without referencing the Communications module:
 
@@ -169,7 +217,7 @@ await bus.PublishAsync(new SendSmsRequestedEvent
 
 ## Messaging Patterns
 
-The Communications module provides user-to-user messaging at `src/Modules/Communications/Foundry.Communications.Domain/Messaging/`. This supports both direct (1:1) and group conversations with inbox threading.
+The Messaging module provides user-to-user messaging at `src/Modules/Messaging/Foundry.Messaging.Domain/Messaging/`. This supports both direct (1:1) and group conversations with inbox threading.
 
 **Domain layer** (`Domain/Messaging/`):
 
@@ -195,7 +243,7 @@ Interfaces:
 - `IConversationRepository` -- EF Core write repository (`Add`, `GetByIdAsync`, `SaveChangesAsync`).
 - `IMessagingQueryService` -- Dapper read service for paginated queries.
 
-**Integration events** (`Shared.Contracts/Communications/Messaging/Events/`):
+**Integration events** (`Shared.Contracts/Messaging/Events/`):
 
 ```csharp
 public sealed record ConversationCreatedIntegrationEvent : IntegrationEvent

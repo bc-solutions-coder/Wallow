@@ -54,30 +54,22 @@ Hangfire is configured in `Program.cs` via the `AddHangfireServices` extension:
 ```csharp
 // src/Foundry.Api/Extensions/HangfireExtensions.cs
 public static IServiceCollection AddHangfireServices(
-    this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    this IServiceCollection services, IConfiguration configuration)
 {
+    string connectionString = configuration.GetConnectionString("DefaultConnection")!;
+
     services.AddHangfire(config =>
     {
         config
             .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
             .UseSimpleAssemblyNameTypeSerializer()
-            .UseRecommendedSerializerSettings();
-
-        if (environment.IsEnvironment("Testing"))
-        {
-            // Use in-memory storage for integration tests
-            config.UseInMemoryStorage();
-        }
-        else
-        {
-            var connectionString = configuration.GetConnectionString("DefaultConnection")!;
-            config.UsePostgreSqlStorage(opts =>
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(opts =>
                 opts.UseNpgsqlConnection(connectionString),
                 new PostgreSqlStorageOptions
                 {
                     SchemaName = "hangfire"
                 });
-        }
     });
 
     services.AddHangfireServer();
@@ -427,35 +419,24 @@ public static class BillingInfrastructureExtensions
 
 ### Application Startup
 
-Jobs are registered via `RegisterRecurringJobs` in `Program.cs`:
+Recurring jobs are registered directly in `Program.cs` using `IRecurringJobManager` via a scoped DI call:
 
 ```csharp
-// src/Foundry.Api/Extensions/HangfireExtensions.cs
-public static void RegisterRecurringJobs(this WebApplication app)
+// In Program.cs — use DI-based IRecurringJobManager, not the static RecurringJob class
+await using (AsyncServiceScope jobScope = app.Services.CreateAsyncScope())
 {
-    // Skip in Testing environment
-    if (app.Environment.IsEnvironment("Testing"))
-    {
-        return;
-    }
+    IRecurringJobManager jobManager = jobScope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
 
-    using var scope = app.Services.CreateScope();
-    var registrations = scope.ServiceProvider.GetServices<IRecurringJobRegistration>();
+    jobManager.AddOrUpdate<SystemHeartbeatJob>(
+        "system-heartbeat",
+        job => job.ExecuteAsync(),
+        "*/5 * * * *");
 
-    foreach (var registration in registrations)
-    {
-        registration.RegisterJobs();
-    }
+    jobManager.AddOrUpdate<RetryFailedEmailsJob>(
+        "retry-failed-emails",
+        job => job.ExecuteAsync(CancellationToken.None),
+        "*/5 * * * *");
 }
-
-// Called in Program.cs
-app.RegisterRecurringJobs();
-
-// API-level jobs can be registered directly
-RecurringJob.AddOrUpdate<SystemHeartbeatJob>(
-    "system-heartbeat",
-    job => job.ExecuteAsync(),
-    "*/5 * * * *"); // Every 5 minutes
 ```
 
 ### Cron Expression Reference

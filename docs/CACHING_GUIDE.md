@@ -53,11 +53,13 @@ The `docker-compose.yml` includes a Valkey container:
 valkey:
   image: valkey/valkey:8-alpine
   container_name: ${COMPOSE_PROJECT_NAME:-foundry}-valkey
-  command: valkey-server --appendonly yes
+  command: valkey-server --appendonly yes --requirepass ${VALKEY_PASSWORD}
   ports:
-    - "6379:6379"
+    - "127.0.0.1:6379:6379"
   volumes:
     - valkey_data:/data
+  environment:
+    REDISCLI_AUTH: ${VALKEY_PASSWORD}
   healthcheck:
     test: ["CMD", "valkey-cli", "ping"]
     interval: 10s
@@ -93,14 +95,22 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 For standard caching scenarios, use the built-in `IDistributedCache` interface:
 
 ```csharp
-// Registration in Program.cs
-builder.Services.AddStackExchangeRedisCache(options =>
+// Registration in Program.cs — reuses the singleton IConnectionMultiplexer
+builder.Services.AddStackExchangeRedisCache(_ => { });
+builder.Services.AddSingleton<IConfigureOptions<RedisCacheOptions>>(sp =>
 {
-    options.ConnectionMultiplexerFactory = async () =>
-    {
-        var connStr = builder.Configuration.GetConnectionString("Redis")!;
-        return await ConnectionMultiplexer.ConnectAsync(connStr);
-    };
+    IConnectionMultiplexer mux = sp.GetRequiredService<IConnectionMultiplexer>();
+    return new ConfigureNamedOptions<RedisCacheOptions>(
+        Options.DefaultName,
+        options => options.ConnectionMultiplexerFactory = () => Task.FromResult(mux));
+});
+
+// Wrap with instrumented decorator for cache hit/miss metrics
+builder.Services.AddSingleton<IDistributedCache>(sp =>
+{
+    IOptions<RedisCacheOptions> options = sp.GetRequiredService<IOptions<RedisCacheOptions>>();
+    RedisCache inner = new(options);
+    return new InstrumentedDistributedCache(inner);
 });
 ```
 

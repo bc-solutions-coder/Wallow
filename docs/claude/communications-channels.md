@@ -1,6 +1,8 @@
 # Communications Channels
 
-The Communications module organizes delivery mechanisms into **channels**. Each channel has its own domain entities, preferences, and provider abstraction.
+> **HISTORICAL DOCUMENT** — This document describes the former Communications module architecture. The Communications module was subsequently split into three separate modules: **Notifications** (email, SMS, in-app notifications), **Messaging** (user-to-user conversations), and **Announcements** (tenant-wide broadcasts). All file paths in this document reference the old `Foundry.Communications.*` project structure which no longer exists. For current architecture, refer to the individual module CLAUDE.md files under `src/Modules/Notifications/`, `src/Modules/Messaging/`, and `src/Modules/Announcements/`.
+
+The (former) Communications module organized delivery mechanisms into **channels**. Each channel had its own domain entities, preferences, and provider abstraction.
 
 ---
 

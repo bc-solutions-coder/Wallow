@@ -10,7 +10,6 @@ using Foundry.Storage.Infrastructure.Extensions;
 using Foundry.Storage.Infrastructure.Persistence;
 using Foundry.Storage.Infrastructure.Scanning;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

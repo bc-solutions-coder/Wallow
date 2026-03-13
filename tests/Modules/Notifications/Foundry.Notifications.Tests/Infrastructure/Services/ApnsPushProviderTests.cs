@@ -3,7 +3,7 @@ using Foundry.Notifications.Application.Channels.Push.Interfaces;
 using Foundry.Notifications.Domain.Channels.Push.Entities;
 using Foundry.Notifications.Infrastructure.Services;
 using Foundry.Shared.Kernel.Identity;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace Foundry.Notifications.Tests.Infrastructure.Services;
 
@@ -18,11 +18,19 @@ public class ApnsPushProviderTests
         "Test Body",
         TimeProvider.System);
 
+#pragma warning disable CA2000 // LoggerFactory disposal not needed in tests
+    private static ILogger<ApnsPushProvider> CreateLogger()
+    {
+        return LoggerFactory.Create(b => b.AddSimpleConsole().SetMinimumLevel(LogLevel.Trace))
+            .CreateLogger<ApnsPushProvider>();
+    }
+#pragma warning restore CA2000
+
 #pragma warning disable CA2000 // Provider takes ownership of HttpClient
     private static ApnsPushProvider CreateProvider(HttpMessageHandler handler)
     {
         HttpClient httpClient = new(handler);
-        return new ApnsPushProvider(httpClient, NullLogger<ApnsPushProvider>.Instance);
+        return new ApnsPushProvider(httpClient, CreateLogger());
     }
 #pragma warning restore CA2000
 
@@ -113,5 +121,50 @@ public class ApnsPushProviderTests
 
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Contain("timed out");
+    }
+
+    [Fact]
+    public async Task SendAsync_SetsJsonContentType()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.OK);
+        ApnsPushProvider provider = CreateProvider(handler);
+
+        await provider.SendAsync(_message, DeviceToken);
+
+        handler.LastRequest!.Content!.Headers.ContentType!.MediaType.Should().Be("application/json");
+    }
+
+    [Fact]
+    public async Task SendAsync_PayloadContainsApsStructure()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.OK);
+        ApnsPushProvider provider = CreateProvider(handler);
+
+        await provider.SendAsync(_message, DeviceToken);
+
+        handler.LastRequestBody.Should().Contain("\"aps\":");
+        handler.LastRequestBody.Should().Contain("\"alert\":");
+    }
+
+    [Fact]
+    public async Task SendAsync_WhenNonSuccessStatusCode_ErrorMessageContainsStatusCodeAndResponseBody()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.NotFound, "{\"reason\":\"BadDeviceToken\"}");
+        ApnsPushProvider provider = CreateProvider(handler);
+
+        PushDeliveryResult result = await provider.SendAsync(_message, DeviceToken);
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("404");
+        result.ErrorMessage.Should().Contain("BadDeviceToken");
+    }
+
+    [Fact]
+    public async Task SendAsync_ImplementsIPushProvider()
+    {
+        using MockHttpMessageHandler handler = new(HttpStatusCode.OK);
+        ApnsPushProvider provider = CreateProvider(handler);
+
+        provider.Should().BeAssignableTo<IPushProvider>();
     }
 }

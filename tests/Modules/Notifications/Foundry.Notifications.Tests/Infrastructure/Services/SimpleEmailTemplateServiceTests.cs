@@ -1,11 +1,15 @@
 using Foundry.Notifications.Infrastructure.Services;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace Foundry.Notifications.Tests.Infrastructure.Services;
 
 public class SimpleEmailTemplateServiceTests
 {
-    private readonly SimpleEmailTemplateService _service = new(NullLogger<SimpleEmailTemplateService>.Instance);
+#pragma warning disable CA2000 // LoggerFactory disposal not needed in tests
+    private readonly SimpleEmailTemplateService _service = new(
+        LoggerFactory.Create(b => b.AddSimpleConsole().SetMinimumLevel(LogLevel.Trace))
+            .CreateLogger<SimpleEmailTemplateService>());
+#pragma warning restore CA2000
 
     [Fact]
     public async Task RenderAsync_WelcomeEmailTemplate_ContainsPlaceholderValues()
@@ -239,4 +243,20 @@ public class SimpleEmailTemplateServiceTests
         result.Should().Contain("<html>");
         result.Should().Contain("</html>");
     }
+
+#pragma warning disable CA2000 // LoggerFactory disposal not needed in tests
+    [Fact]
+    public async Task RenderAsync_WithLoggingDisabled_StillRendersTemplate()
+    {
+        SimpleEmailTemplateService service = new(
+            LoggerFactory.Create(b => b.AddSimpleConsole().SetMinimumLevel(LogLevel.None))
+                .CreateLogger<SimpleEmailTemplateService>());
+        object model = new { Message = "Test notification" };
+
+        string result = await service.RenderAsync("systemnotification", model);
+
+        result.Should().Contain("Test notification");
+        result.Should().Contain("System Notification");
+    }
+#pragma warning restore CA2000
 }

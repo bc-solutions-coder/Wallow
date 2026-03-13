@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using Foundry.Notifications.Application.Channels.Sms.Interfaces;
 using Foundry.Notifications.Infrastructure.Services;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Foundry.Notifications.Tests.Infrastructure.Services;
@@ -23,10 +23,18 @@ public sealed class TwilioSmsProviderTests : IDisposable
     private MockHttpMessageHandler? _handler;
     private HttpClient? _httpClient;
 
+#pragma warning disable CA2000 // LoggerFactory disposal not needed in tests
+    private static ILogger<TwilioSmsProvider> CreateLogger()
+    {
+        return LoggerFactory.Create(b => b.AddSimpleConsole().SetMinimumLevel(LogLevel.Trace))
+            .CreateLogger<TwilioSmsProvider>();
+    }
+#pragma warning restore CA2000
+
     private TwilioSmsProvider CreateSut(HttpMessageHandler handler)
     {
         _httpClient = new HttpClient(handler);
-        return new TwilioSmsProvider(_httpClient, _settings, NullLogger<TwilioSmsProvider>.Instance);
+        return new TwilioSmsProvider(_httpClient, _settings, CreateLogger());
     }
 
     [Fact]
@@ -144,6 +152,95 @@ public sealed class TwilioSmsProviderTests : IDisposable
 
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Be("Authenticate");
+    }
+
+    [Fact]
+    public async Task SendAsync_RateLimitedResponse_ReturnsFailureWithMessage()
+    {
+        string responseJson = """{"message": "Rate limit exceeded"}""";
+        _handler = new MockHttpMessageHandler(HttpStatusCode.TooManyRequests, responseJson);
+        TwilioSmsProvider sut = CreateSut(_handler);
+
+        SmsDeliveryResult result = await sut.SendAsync("+15559876543", "test");
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Be("Rate limit exceeded");
+    }
+
+    [Fact]
+    public async Task SendAsync_SuccessWithNullSidValue_ReturnsNullSid()
+    {
+        string responseJson = """{"sid": null, "status": "queued"}""";
+        _handler = new MockHttpMessageHandler(HttpStatusCode.OK, responseJson);
+        TwilioSmsProvider sut = CreateSut(_handler);
+
+        SmsDeliveryResult result = await sut.SendAsync("+15559876543", "test");
+
+        result.Success.Should().BeTrue();
+        result.MessageSid.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SendAsync_ErrorResponseWithNullMessageValue_FallsBackToReasonPhrase()
+    {
+        string responseJson = """{"message": null}""";
+        _handler = new MockHttpMessageHandler(HttpStatusCode.BadRequest, responseJson);
+        TwilioSmsProvider sut = CreateSut(_handler);
+
+        SmsDeliveryResult result = await sut.SendAsync("+15559876543", "test");
+
+        result.Success.Should().BeFalse();
+        // Falls back to ReasonPhrase since message is null
+    }
+
+    [Fact]
+    public async Task SendAsync_ForbiddenResponse_ReturnsFailure()
+    {
+        string responseJson = """{"message": "Permission denied"}""";
+        _handler = new MockHttpMessageHandler(HttpStatusCode.Forbidden, responseJson);
+        TwilioSmsProvider sut = CreateSut(_handler);
+
+        SmsDeliveryResult result = await sut.SendAsync("+15559876543", "test");
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Be("Permission denied");
+    }
+
+    [Fact]
+    public async Task SendAsync_TaskCanceledException_ReturnsFailure()
+    {
+        using ThrowingHttpMessageHandler handler = new(new TaskCanceledException("Request timed out"));
+        TwilioSmsProvider sut = CreateSut(handler);
+
+        SmsDeliveryResult result = await sut.SendAsync("+15559876543", "test");
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("timed out");
+    }
+
+    [Fact]
+    public async Task SendAsync_EmptyBody_SendsRequest()
+    {
+        _handler = new MockHttpMessageHandler(HttpStatusCode.OK, """{"sid": "SM1"}""");
+        TwilioSmsProvider sut = CreateSut(_handler);
+
+        SmsDeliveryResult result = await sut.SendAsync("+15559876543", "");
+
+        result.Success.Should().BeTrue();
+        _handler.LastRequestBody.Should().Contain("Body=");
+    }
+
+    [Fact]
+    public async Task SendAsync_ServiceUnavailable_ReturnsFailure()
+    {
+        string responseJson = """{"message": "Service temporarily unavailable"}""";
+        _handler = new MockHttpMessageHandler(HttpStatusCode.ServiceUnavailable, responseJson);
+        TwilioSmsProvider sut = CreateSut(_handler);
+
+        SmsDeliveryResult result = await sut.SendAsync("+15559876543", "test");
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Be("Service temporarily unavailable");
     }
 
     public void Dispose()

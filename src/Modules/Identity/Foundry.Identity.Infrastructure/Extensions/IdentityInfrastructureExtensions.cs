@@ -5,9 +5,11 @@ using Foundry.Identity.Infrastructure.Persistence;
 using Foundry.Identity.Infrastructure.Repositories;
 using Foundry.Identity.Infrastructure.Services;
 using Foundry.Shared.Infrastructure.Settings;
+using Foundry.Shared.Infrastructure.Core.Resilience;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Keycloak.AuthServices.Authentication;
 using Keycloak.AuthServices.Sdk;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -15,11 +17,10 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Microsoft.AspNetCore.Authentication;
-using Foundry.Shared.Infrastructure.Core.Resilience;
 
 namespace Foundry.Identity.Infrastructure.Extensions;
 
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public static class IdentityInfrastructureExtensions
 {
     public static IServiceCollection AddIdentityInfrastructure(

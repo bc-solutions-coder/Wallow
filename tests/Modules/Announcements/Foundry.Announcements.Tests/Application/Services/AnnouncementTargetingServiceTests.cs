@@ -258,6 +258,89 @@ public class AnnouncementTargetingServiceTests
     }
 
     [Fact]
+    public async Task GetActiveAnnouncementsForUserAsync_TargetTenant_WithNullTargetValue_ExcludesAnnouncement()
+    {
+        Announcement tenantTarget = CreatePublishedAnnouncement(target: AnnouncementTarget.Tenant, targetValue: null);
+        _announcementRepository.GetPublishedAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<Announcement> { tenantTarget });
+        _dismissalRepository.GetByUserIdAsync(Arg.Any<UserId>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AnnouncementDismissal>());
+
+        IReadOnlyList<AnnouncementDto> result = await _service.GetActiveAnnouncementsForUserAsync(CreateUserContext());
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetActiveAnnouncementsForUserAsync_TargetTenant_WithInvalidGuidTargetValue_ExcludesAnnouncement()
+    {
+        Announcement tenantTarget = CreatePublishedAnnouncement(target: AnnouncementTarget.Tenant, targetValue: "not-a-guid");
+        _announcementRepository.GetPublishedAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<Announcement> { tenantTarget });
+        _dismissalRepository.GetByUserIdAsync(Arg.Any<UserId>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AnnouncementDismissal>());
+
+        IReadOnlyList<AnnouncementDto> result = await _service.GetActiveAnnouncementsForUserAsync(CreateUserContext());
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetActiveAnnouncementsForUserAsync_TargetPlan_WithNullTargetValue_ExcludesAnnouncement()
+    {
+        Announcement planTarget = CreatePublishedAnnouncement(target: AnnouncementTarget.Plan, targetValue: null);
+        _announcementRepository.GetPublishedAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<Announcement> { planTarget });
+        _dismissalRepository.GetByUserIdAsync(Arg.Any<UserId>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AnnouncementDismissal>());
+
+        IReadOnlyList<AnnouncementDto> result = await _service.GetActiveAnnouncementsForUserAsync(CreateUserContext(planName: "pro"));
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetActiveAnnouncementsForUserAsync_TargetPlan_WithNullUserPlan_ExcludesAnnouncement()
+    {
+        Announcement planTarget = CreatePublishedAnnouncement(target: AnnouncementTarget.Plan, targetValue: "pro");
+        _announcementRepository.GetPublishedAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<Announcement> { planTarget });
+        _dismissalRepository.GetByUserIdAsync(Arg.Any<UserId>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AnnouncementDismissal>());
+
+        IReadOnlyList<AnnouncementDto> result = await _service.GetActiveAnnouncementsForUserAsync(CreateUserContext(planName: null));
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetActiveAnnouncementsForUserAsync_TargetRole_WithNullTargetValue_ExcludesAnnouncement()
+    {
+        Announcement roleTarget = CreatePublishedAnnouncement(target: AnnouncementTarget.Role, targetValue: null);
+        _announcementRepository.GetPublishedAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<Announcement> { roleTarget });
+        _dismissalRepository.GetByUserIdAsync(Arg.Any<UserId>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AnnouncementDismissal>());
+
+        IReadOnlyList<AnnouncementDto> result = await _service.GetActiveAnnouncementsForUserAsync(CreateUserContext(roles: ["admin"]));
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetActiveAnnouncementsForUserAsync_WithNoActivePublished_ReturnsEmpty()
+    {
+        _announcementRepository.GetPublishedAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<Announcement>());
+        _dismissalRepository.GetByUserIdAsync(Arg.Any<UserId>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AnnouncementDismissal>());
+
+        IReadOnlyList<AnnouncementDto> result = await _service.GetActiveAnnouncementsForUserAsync(CreateUserContext());
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ResolveTargetUsersAsync_ReturnsEmptyList()
     {
         Announcement announcement = CreatePublishedAnnouncement();

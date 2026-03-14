@@ -45,11 +45,22 @@ Add to `MapScopeToPermission` in `Foundry.Identity.Infrastructure/Authorization/
 - `"inquiries.read" => PermissionType.InquiriesRead`
 - `"inquiries.write" => PermissionType.InquiriesWrite`
 
-`showcases.read` is already mapped. No change needed.
+Note: `showcases.read` and `showcases.manage` are already mapped in `MapScopeToPermission` (to `ShowcasesRead` and `ShowcasesManage` respectively). No middleware change needed for them. However, neither is in `ApiScopes.ValidScopes` or the seeder. Only `showcases.read` is added in this spec because the bcordes.dev integration only needs read access to showcases. `showcases.manage` is intentionally excluded - it can be added later if a service account needs write access to showcases.
 
 ### ApiScopeSeeder additions
 
-Add 3 new scopes to the seeder with categories "Showcases" and "Inquiries". Update `ApiScopeSeederGapTests` expected count from 11 to 14.
+Add 3 new scopes to `GetDefaultScopes()` in the seeder:
+
+- `showcases.read` - Category: "Showcases", DisplayName: "Read Showcases"
+- `inquiries.read` - Category: "Inquiries", DisplayName: "Read Inquiries"
+- `inquiries.write` - Category: "Inquiries", DisplayName: "Write Inquiries"
+
+### ApiScopeSeederGapTests updates
+
+- Update expected count from 11 to 14 in all assertions (`SeedAsync_WhenEmpty_SeedsExactlyElevenScopes` and related tests)
+- Add `"showcases.read"`, `"inquiries.read"`, `"inquiries.write"` to the expected scope codes list in `SeedAsync_SeedsAllExpectedScopeCodes`
+- Add `"Showcases"` and `"Inquiries"` to the expected categories in `SeedAsync_SeedsAllExpectedCategories`
+- Update `SeedAsync_WhenSomeScopesExist_OnlySeedsMissingOnes`, `SeedAsync_WhenMultipleScopesExist_OnlySeedsRemaining`, and `SeedAsync_WithCancellationToken_PropagatesToken` counts
 
 ### RolePermissionMapping additions
 
@@ -69,6 +80,8 @@ Add 3 new scopes to the seeder with categories "Showcases" and "Inquiries". Upda
 - Drop `Subject`
 - Add `ProjectType` (string, required), `BudgetRange` (string, required), `Timeline` (string, required)
 - Keep `Phone` (string?, optional)
+
+Note: `ProjectType`, `BudgetRange`, and `Timeline` are free-form strings in the API and domain. The domain has corresponding enums (`ProjectType`, `BudgetRange`, `Timeline` in `Inquiries.Domain/Enums/`) but the entity stores them as strings and the DB columns are `varchar(100)`. The API accepts any string value; validation enforces only non-empty and max length. The frontend is responsible for sending meaningful values (e.g., enum display names).
 
 ### Domain entity changes
 
@@ -96,7 +109,16 @@ Update `InquiryResponse` to include: `ProjectType`, `BudgetRange`, `Timeline`, `
 
 ### SubmitInquiryCommand update
 
-Add `Phone` and `SubmitterId` fields to the command record.
+- Add `Phone` and `SubmitterId` fields to the command record.
+- Remove `HoneypotField` parameter. Since the endpoint now requires authentication (`InquiriesWrite` permission), unauthenticated bot submissions are blocked at the auth layer. The honeypot check in the handler should also be removed.
+
+### Integration event contract update
+
+Update `InquirySubmittedEvent` in `Foundry.Shared.Contracts/Inquiries/Events/`:
+- Rename `Subject` property to `ProjectType` (aligns with the domain model)
+- Add `Phone` property (string?, optional)
+- Retain `AdminEmail` property (used by Notifications module for admin email notifications on submission)
+- Update the domain event handler mapping accordingly
 
 ---
 
@@ -125,24 +147,37 @@ Change from `[Authorize]` to `[HasPermission(PermissionType.InquiriesRead)]`. Ad
 
 ### Modified endpoint: `GET /api/v1/inquiries/{id}`
 
-Allow access if caller has `InquiriesRead` permission OR is the submitter (email match or SubmitterId match). Return 403 otherwise.
+Allow access if caller has `InquiriesRead` permission OR is the submitter (email match or SubmitterId match). Return 404 for unauthorized callers (to avoid leaking inquiry existence).
+
+**Implementation approach:** Remove the `[HasPermission]` attribute from this action. Instead, use imperative authorization in the controller action body:
+1. Fetch the inquiry from the repository
+2. If not found, return 404
+3. Check if the caller has `InquiriesRead` permission via `User.HasClaim("permission", PermissionType.InquiriesRead)`
+4. If not, check if the caller's email or sub claim matches the inquiry's email/SubmitterId
+5. If neither, return 404 (not 403, to avoid leaking existence)
 
 ---
 
 ## 4. SignalR Events via Notifications Module
 
-The Inquiries module already publishes `InquirySubmittedEvent` and `InquiryStatusChangedEvent` as integration events via RabbitMQ/Wolverine. The Notifications module subscribes to these events and dispatches SignalR notifications.
+The Inquiries module already publishes `InquirySubmittedEvent` and `InquiryStatusChangedEvent` as integration events via Wolverine/Wolverine. The Notifications module subscribes to these events and dispatches SignalR notifications.
+
+### Tenant context for SignalR dispatch
+
+Wolverine propagates tenant context via `X-Tenant-Id` message headers (stamped by `TenantStampingMiddleware`, restored by `TenantRestoringMiddleware`). Handlers inject `ITenantContext` to access `TenantId`. The integration events do not need to carry `TenantId` explicitly; it flows through the message envelope headers.
 
 ### New handlers in Notifications module
 
-**`InquirySubmittedEventHandler`** (in `Foundry.Notifications.Application` or `.Infrastructure`):
+**`InquirySubmittedEventHandler`** (in `Foundry.Notifications.Application`):
 - Subscribes to `InquirySubmittedEvent`
+- Injects `IRealtimeDispatcher` and `ITenantContext`
 - Dispatches: `RealtimeEnvelope.Create("Inquiries", "InquirySubmitted", new { InquiryId, Name, Email })`
-- Target: tenant group via `IRealtimeDispatcher.SendToTenantAsync()`
+- Target: `dispatcher.SendToTenantAsync(tenantContext.TenantId.Value, envelope)`
 - Client receives on `ReceiveInquiries`
 
 **`InquiryStatusChangedEventHandler`**:
 - Subscribes to `InquiryStatusChangedEvent`
+- Same injection pattern
 - Dispatches: `RealtimeEnvelope.Create("Inquiries", "InquiryStatusUpdated", new { InquiryId, NewStatus })`
 - Same tenant group dispatch pattern
 
@@ -179,13 +214,15 @@ Properties:
 - Auth: `[Authorize]`
 - Admin (has `InquiriesRead`): returns all comments
 - Submitter (matched by email or SubmitterId): returns only `IsInternal = false` comments
-- Others: 403 Forbidden
+- Others: return 404 (not 403, to avoid leaking inquiry existence)
+- **Implementation:** imperative authorization in controller action body, same pattern as `GET /api/v1/inquiries/{id}` (see Section 3)
 
 ### Integration event
 
 `InquiryCommentAddedEvent` (in `Foundry.Shared.Contracts/Inquiries/Events/`):
 - Properties: `InquiryId`, `CommentId`, `IsInternal`, `AddedAt`
 - Published via Wolverine bus from the domain event handler
+- Wolverine auto-discovers handlers, so no explicit routing registration needed for in-memory bus. The handler in the Notifications module will automatically subscribe to this event.
 
 Notifications module subscribes and dispatches:
 - `RealtimeEnvelope.Create("Inquiries", "InquiryCommentAdded", new { InquiryId, CommentId, IsInternal })`
@@ -274,7 +311,11 @@ Implementation: remove existing migration, create a fresh `InitialCreate` migrat
 - `InquiryCommentAddedSignalRHandler.cs` - new handler
 
 ### Shared.Contracts
+- `InquirySubmittedEvent.cs` - rename `Subject` to `ProjectType`, add `Phone`
 - `InquiryCommentAddedEvent.cs` - new integration event
+
+### Api (Program.cs)
+- No changes needed; Wolverine auto-discovers handlers for in-memory bus
 
 ### Tests
 - Update existing tests for new contract/auth requirements

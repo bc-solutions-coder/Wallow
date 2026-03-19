@@ -1,22 +1,20 @@
 using Foundry.Identity.Application.Interfaces;
 using Foundry.Identity.Application.Settings;
+using Foundry.Identity.Domain.Entities;
 using Foundry.Identity.Infrastructure.Authorization;
 using Foundry.Identity.Infrastructure.Persistence;
 using Foundry.Identity.Infrastructure.Repositories;
 using Foundry.Identity.Infrastructure.Services;
-using Foundry.Shared.Infrastructure.Core.Resilience;
 using Foundry.Shared.Infrastructure.Settings;
 using Foundry.Shared.Kernel.MultiTenancy;
-using Keycloak.AuthServices.Authentication;
-using Keycloak.AuthServices.Sdk;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace Foundry.Identity.Infrastructure.Extensions;
 
@@ -26,18 +24,56 @@ public static class IdentityInfrastructureExtensions
     public static IServiceCollection AddIdentityInfrastructure(
         this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddKeycloakWebApiAuthentication(configuration, options =>
+        services.AddIdentityCore<FoundryUser>(options =>
             {
-                options.RequireHttpsMetadata = !Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
-                    ?.Equals("Development", StringComparison.OrdinalIgnoreCase) ?? true;
-                options.Audience = "foundry-api";
-            }, "Keycloak");
+                options.Password.RequiredLength = 8;
+                options.User.RequireUniqueEmail = true;
+                options.SignIn.RequireConfirmedEmail = true;
+            })
+            .AddRoles<FoundryRole>()
+            .AddSignInManager()
+            .AddEntityFrameworkStores<IdentityDbContext>()
+            .AddDefaultTokenProviders();
+
+        services.AddOpenIddict()
+            .AddCore(options =>
+            {
+                options.UseEntityFrameworkCore()
+                    .UseDbContext<IdentityDbContext>();
+            })
+            .AddServer(options =>
+            {
+                options.SetAuthorizationEndpointUris("/connect/authorize")
+                    .SetTokenEndpointUris("/connect/token")
+                    .SetLogoutEndpointUris("/connect/logout")
+                    .SetUserInfoEndpointUris("/connect/userinfo");
+
+                options.AllowAuthorizationCodeFlow().RequireProofKeyForCodeExchange()
+                    .AllowClientCredentialsFlow()
+                    .AllowRefreshTokenFlow();
+
+                options.AddDevelopmentEncryptionCertificate()
+                    .AddDevelopmentSigningCertificate();
+
+                options.UseAspNetCore()
+                    .EnableAuthorizationEndpointPassthrough()
+                    .EnableTokenEndpointPassthrough()
+                    .EnableLogoutEndpointPassthrough()
+                    .EnableUserInfoEndpointPassthrough();
+
+                options.RegisterScopes("openid", "profile", "email", "roles");
+            })
+            .AddValidation(options =>
+            {
+                options.UseLocalServer();
+                options.UseAspNetCore();
+            });
 
         services.AddIdentityAuthorization();
         services.AddMultiTenancy();
         services.AddIdentityPersistence(configuration);
         services.AddSettings<IdentityDbContext, IdentitySettingKeys>("identity");
-        services.AddKeycloakAdmin(configuration);
+        services.AddIdentityServices();
 
         return services;
     }
@@ -90,37 +126,13 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<ITenantContextSetter>(sp => sp.GetRequiredService<TenantContext>());
     }
 
-    private static void AddKeycloakAdmin(
-        this IServiceCollection services, IConfiguration configuration)
+    private static void AddIdentityServices(this IServiceCollection services)
     {
-        services.Configure<KeycloakOptions>(configuration.GetSection(KeycloakOptions.SectionName));
-
-        services.AddKeycloakAdminHttpClient(configuration);
-
-        services.AddHttpClient("KeycloakAdminClient", (sp, client) =>
-        {
-            KeycloakOptions options = sp.GetRequiredService<IOptions<KeycloakOptions>>().Value;
-            client.BaseAddress = new Uri(options.AuthorityUrl);
-        }).AddFoundryResilienceHandler("identity-provider");
-
-        // Token service for auth proxy (no auth required on this client)
-        services.AddHttpClient("KeycloakTokenClient").AddFoundryResilienceHandler("identity-provider");
-
-        // Dynamic client registration
-        services.AddHttpClient("KeycloakDcrClient", (sp, client) =>
-        {
-            KeycloakOptions options = sp.GetRequiredService<IOptions<KeycloakOptions>>().Value;
-            client.BaseAddress = new Uri(options.AuthorityUrl);
-        }).AddFoundryResilienceHandler("identity-provider");
-
         services.AddMemoryCache();
-        services.AddScoped<IKeycloakAdminService, KeycloakAdminService>();
-        services.AddScoped<IKeycloakOrganizationService, KeycloakOrganizationService>();
         services.AddScoped<ITokenService, KeycloakTokenService>();
         services.AddScoped<IApiKeyService, RedisApiKeyService>();
         services.AddScoped<IServiceAccountService, KeycloakServiceAccountService>();
         services.AddScoped<SsoClaimsSyncService>();
-        services.AddScoped<KeycloakIdpService>();
         services.AddScoped<ISsoService, KeycloakSsoService>();
         services.AddScoped<ScimUserService>();
         services.AddScoped<ScimGroupService>();

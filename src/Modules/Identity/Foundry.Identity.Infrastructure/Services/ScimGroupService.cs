@@ -1,27 +1,20 @@
-using System.Net.Http.Json;
 using Foundry.Identity.Application.DTOs;
 using Foundry.Identity.Application.Interfaces;
 using Foundry.Identity.Domain.Entities;
 using Foundry.Identity.Domain.Enums;
-using Foundry.Identity.Infrastructure.Extensions;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Foundry.Identity.Infrastructure.Services;
 
 public sealed partial class ScimGroupService(
-    IHttpClientFactory httpClientFactory,
+    IOrganizationService organizationService,
     IScimConfigurationRepository scimRepository,
     IScimSyncLogRepository syncLogRepository,
     ITenantContext tenantContext,
-    IOptions<KeycloakOptions> keycloakOptions,
     ILogger<ScimGroupService> logger,
     TimeProvider timeProvider)
 {
-    private readonly HttpClient _httpClient = httpClientFactory.CreateClient("KeycloakAdminClient");
-    private readonly string _realm = keycloakOptions.Value.Realm;
-
     public async Task<ScimGroup> CreateGroupAsync(ScimGroupRequest request, CancellationToken ct = default)
     {
         string externalId = request.ExternalId ?? Guid.NewGuid().ToString();
@@ -30,32 +23,20 @@ public sealed partial class ScimGroupService(
 
         try
         {
-            var groupRepresentation = new
-            {
-                name = request.DisplayName,
-                attributes = new Dictionary<string, IEnumerable<string>>
-                {
-                    ["scim_external_id"] = new[] { externalId }
-                }
-            };
-
-            HttpResponseMessage response = await _httpClient.PostAsJsonAsync(
-                $"/admin/realms/{_realm}/groups",
-                groupRepresentation,
-                ct);
-            await response.EnsureSuccessOrThrowAsync();
-
-            string? locationHeader = response.Headers.Location?.ToString();
-            string groupId = locationHeader?.Split('/').Last() ?? throw new InvalidOperationException("Group created but Location header is missing");
+            Guid orgId = await organizationService.CreateOrganizationAsync(request.DisplayName, ct: ct);
 
             if (request.Members != null)
             {
                 foreach (ScimMember member in request.Members)
                 {
-                    await AddUserToGroupAsync(member.Value, groupId, ct);
+                    if (Guid.TryParse(member.Value, out Guid userId))
+                    {
+                        await organizationService.AddMemberAsync(orgId, userId, ct);
+                    }
                 }
             }
 
+            string groupId = orgId.ToString();
             await LogSyncAsync(ScimOperation.Create, ScimResourceType.Group, externalId, groupId, true, ct: ct);
 
             LogScimGroupCreated(request.DisplayName, groupId);
@@ -78,38 +59,39 @@ public sealed partial class ScimGroupService(
 
         try
         {
-            var groupRepresentation = new
+            if (!Guid.TryParse(id, out Guid orgId))
             {
-                name = request.DisplayName,
-                attributes = new Dictionary<string, IEnumerable<string>>
-                {
-                    ["scim_external_id"] = new[] { externalId }
-                }
-            };
+                throw new InvalidOperationException($"Invalid group ID '{id}'");
+            }
 
-            HttpResponseMessage response = await _httpClient.PutAsJsonAsync(
-                $"/admin/realms/{_realm}/groups/{id}",
-                groupRepresentation,
-                ct);
-            await response.EnsureSuccessOrThrowAsync();
+            OrganizationDto? org = await organizationService.GetOrganizationByIdAsync(orgId, ct);
+            if (org is null)
+            {
+                throw new InvalidOperationException($"Group '{id}' not found");
+            }
 
             if (request.Members != null)
             {
-                List<string> currentMembers = await GetGroupMembersAsync(id, ct);
+                IReadOnlyList<UserDto> currentMembers = await organizationService.GetMembersAsync(orgId, ct);
+                HashSet<Guid> currentMemberIds = currentMembers.Select(m => m.Id).ToHashSet();
+                HashSet<Guid> requestedMemberIds = request.Members
+                    .Where(m => Guid.TryParse(m.Value, out _))
+                    .Select(m => Guid.Parse(m.Value))
+                    .ToHashSet();
 
-                foreach (string member in currentMembers)
+                foreach (Guid memberId in currentMemberIds)
                 {
-                    if (!request.Members.Any(m => m.Value == member))
+                    if (!requestedMemberIds.Contains(memberId))
                     {
-                        await RemoveUserFromGroupAsync(member, id, ct);
+                        await organizationService.RemoveMemberAsync(orgId, memberId, ct);
                     }
                 }
 
-                foreach (ScimMember member in request.Members)
+                foreach (Guid memberId in requestedMemberIds)
                 {
-                    if (!currentMembers.Contains(member.Value))
+                    if (!currentMemberIds.Contains(memberId))
                     {
-                        await AddUserToGroupAsync(member.Value, id, ct);
+                        await organizationService.AddMemberAsync(orgId, memberId, ct);
                     }
                 }
             }
@@ -134,8 +116,18 @@ public sealed partial class ScimGroupService(
 
         try
         {
-            HttpResponseMessage response = await _httpClient.DeleteAsync($"/admin/realms/{_realm}/groups/{id}", ct);
-            await response.EnsureSuccessOrThrowAsync();
+            if (!Guid.TryParse(id, out Guid orgId))
+            {
+                throw new InvalidOperationException($"Invalid group ID '{id}'");
+            }
+
+            // Organization deletion not yet supported via IOrganizationService;
+            // for now we remove all members to effectively disable the group
+            IReadOnlyList<UserDto> members = await organizationService.GetMembersAsync(orgId, ct);
+            foreach (UserDto member in members)
+            {
+                await organizationService.RemoveMemberAsync(orgId, member.Id, ct);
+            }
 
             await LogSyncAsync(ScimOperation.Delete, ScimResourceType.Group, id, id, true, ct: ct);
 
@@ -154,27 +146,25 @@ public sealed partial class ScimGroupService(
         int first = Math.Max(0, request.StartIndex - 1);
         int max = Math.Min(request.Count, ScimConstants.MaxPageSize);
 
-        HttpResponseMessage response = await _httpClient.GetAsync($"/admin/realms/{_realm}/groups?first={first}&max={max}", ct);
-        await response.EnsureSuccessOrThrowAsync();
-
-        List<ScimKeycloakGroupRepresentation>? groups = await response.Content.ReadFromJsonAsync<List<ScimKeycloakGroupRepresentation>>(ct);
+        IReadOnlyList<OrganizationDto> organizations = await organizationService.GetOrganizationsAsync(
+            search: null,
+            first: first,
+            max: max,
+            ct: ct);
 
         List<ScimGroup> scimGroups = [];
-        foreach (ScimKeycloakGroupRepresentation group in groups ?? [])
+        foreach (OrganizationDto org in organizations)
         {
-            if (group.Id != null)
+            ScimGroup? scimGroup = await GetGroupAsync(org.Id.ToString(), ct);
+            if (scimGroup != null)
             {
-                ScimGroup? scimGroup = await GetGroupAsync(group.Id, ct);
-                if (scimGroup != null)
-                {
-                    scimGroups.Add(scimGroup);
-                }
+                scimGroups.Add(scimGroup);
             }
         }
 
         return new ScimListResponse<ScimGroup>
         {
-            TotalResults = groups?.Count ?? 0,
+            TotalResults = organizations.Count,
             StartIndex = request.StartIndex,
             ItemsPerPage = scimGroups.Count,
             Resources = scimGroups
@@ -185,31 +175,28 @@ public sealed partial class ScimGroupService(
     {
         try
         {
-            HttpResponseMessage response = await _httpClient.GetAsync($"/admin/realms/{_realm}/groups/{id}", ct);
-            if (!response.IsSuccessStatusCode)
+            if (!Guid.TryParse(id, out Guid orgId))
             {
                 return null;
             }
 
-            ScimKeycloakGroupRepresentation? group = await response.Content.ReadFromJsonAsync<ScimKeycloakGroupRepresentation>(ct);
-            if (group == null)
+            OrganizationDto? org = await organizationService.GetOrganizationByIdAsync(orgId, ct);
+            if (org is null)
             {
                 return null;
             }
 
-            List<string> members = await GetGroupMembersAsync(id, ct);
-
-            string? externalId = group.Attributes?.GetValueOrDefault("scim_external_id")?.FirstOrDefault();
+            IReadOnlyList<UserDto> members = await organizationService.GetMembersAsync(orgId, ct);
 
             return new ScimGroup
             {
                 Id = id,
-                ExternalId = externalId,
-                DisplayName = group.Name ?? string.Empty,
+                ExternalId = id,
+                DisplayName = org.Name,
                 Members = members.Select(m => new ScimMember
                 {
-                    Value = m,
-                    Ref = $"/scim/v2/Users/{m}",
+                    Value = m.Id.ToString(),
+                    Ref = $"/scim/v2/Users/{m.Id}",
                     Type = "User"
                 }).ToList(),
                 Meta = new ScimMeta
@@ -224,42 +211,6 @@ public sealed partial class ScimGroupService(
             LogGetScimGroupFailed(ex, id);
             return null;
         }
-    }
-
-    private async Task<List<string>> GetGroupMembersAsync(string groupId, CancellationToken ct)
-    {
-        try
-        {
-            HttpResponseMessage response = await _httpClient.GetAsync($"/admin/realms/{_realm}/groups/{groupId}/members", ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                return [];
-            }
-
-            List<ScimKeycloakUserRepresentation>? members = await response.Content.ReadFromJsonAsync<List<ScimKeycloakUserRepresentation>>(ct);
-            return members?.Select(m => m.Id ?? "").Where(id => !string.IsNullOrEmpty(id)).ToList() ?? [];
-        }
-        catch
-        {
-            return [];
-        }
-    }
-
-    private async Task AddUserToGroupAsync(string userId, string groupId, CancellationToken ct)
-    {
-        HttpResponseMessage response = await _httpClient.PutAsync(
-            $"/admin/realms/{_realm}/users/{userId}/groups/{groupId}",
-            null,
-            ct);
-        await response.EnsureSuccessOrThrowAsync();
-    }
-
-    private async Task RemoveUserFromGroupAsync(string userId, string groupId, CancellationToken ct)
-    {
-        HttpResponseMessage response = await _httpClient.DeleteAsync(
-            $"/admin/realms/{_realm}/users/{userId}/groups/{groupId}",
-            ct);
-        await response.EnsureSuccessOrThrowAsync();
     }
 
     private async Task LogSyncAsync(

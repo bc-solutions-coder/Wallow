@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Foundry.Identity.Application.Constants;
 using Microsoft.AspNetCore.Http;
 
@@ -46,32 +45,7 @@ public class PermissionExpansionMiddleware(RequestDelegate next)
             .Select(c => c.Value)
             .ToList();
 
-        if (standardRoles.Count > 0)
-        {
-            roles.AddRange(standardRoles);
-        }
-        else
-        {
-            // Fallback: Check Keycloak-specific realm_access claim
-            string? realmAccess = context.User.FindFirst("realm_access")?.Value;
-            if (!string.IsNullOrEmpty(realmAccess))
-            {
-                try
-                {
-                    JsonElement parsed = JsonSerializer.Deserialize<JsonElement>(realmAccess);
-                    if (parsed.TryGetProperty("roles", out JsonElement rolesArray))
-                    {
-                        roles.AddRange(rolesArray.EnumerateArray()
-                            .Where(r => r.GetString() != null)
-                            .Select(r => r.GetString()!));
-                    }
-                }
-                catch (JsonException)
-                {
-                    // Invalid JSON in realm_access claim, skip
-                }
-            }
-        }
+        roles.AddRange(standardRoles);
 
         // Expand roles to permissions
         if (roles.Count > 0)

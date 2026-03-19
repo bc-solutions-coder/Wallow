@@ -3,105 +3,92 @@ using Foundry.Identity.Application.DTOs;
 
 namespace Foundry.Identity.Infrastructure.Scim;
 
-public sealed record KeycloakQueryParams(
-    string? Username = null,
+public sealed record ScimFilterParams(
+    string? UserName = null,
     string? Email = null,
     string? FirstName = null,
     string? LastName = null,
     string? Search = null,
     Func<ScimUser, bool>? InMemoryFilter = null);
 
-public sealed class ScimToKeycloakTranslator
+public sealed class ScimAttributeMapper
 {
     private readonly ScimFilterLexer _lexer = new();
     private readonly ScimFilterParser _parser = new();
 
-    public KeycloakQueryParams Translate(string? filter)
+    public ScimFilterParams Translate(string? filter)
     {
         if (string.IsNullOrWhiteSpace(filter))
         {
-            return new KeycloakQueryParams();
+            return new ScimFilterParams();
         }
 
         IReadOnlyList<ScimToken> tokens = _lexer.Tokenize(filter);
         ScimFilterNode ast = _parser.Parse(tokens);
-        ScimToKeycloakVisitor visitor = new();
+        ScimFilterVisitor visitor = new();
         return ast.Accept(visitor);
     }
 
-    private sealed class ScimToKeycloakVisitor : IScimFilterVisitor<KeycloakQueryParams>
+    private sealed class ScimFilterVisitor : IScimFilterVisitor<ScimFilterParams>
     {
-        public KeycloakQueryParams Visit(ComparisonNode node)
+        public ScimFilterParams Visit(ComparisonNode node)
         {
             string normalizedAttr = NormalizeAttributePath(node.AttributePath);
             string op = node.Operator;
             string value = Convert.ToString(node.Value, CultureInfo.InvariantCulture) ?? string.Empty;
 
-            // Keycloak only supports exact match on username, email, firstName, lastName
-            // For "eq" on supported attributes, we can use direct query params
             if (op == "eq")
             {
                 return normalizedAttr switch
                 {
-                    "username" => new KeycloakQueryParams(Username: value),
-                    "email" => new KeycloakQueryParams(Email: value),
-                    "firstname" => new KeycloakQueryParams(FirstName: value),
-                    "lastname" => new KeycloakQueryParams(LastName: value),
+                    "username" => new ScimFilterParams(UserName: value),
+                    "email" => new ScimFilterParams(Email: value),
+                    "firstname" => new ScimFilterParams(FirstName: value),
+                    "lastname" => new ScimFilterParams(LastName: value),
                     _ => CreateInMemoryFilter(node)
                 };
             }
 
-            // For "co" (contains), use Keycloak's search parameter if it's a common field
             if (op == "co")
             {
                 if (normalizedAttr is "username" or "email" or "firstname" or "lastname")
                 {
-                    return new KeycloakQueryParams(Search: value);
+                    return new ScimFilterParams(Search: value);
                 }
             }
 
-            // For all other operators or unsupported attributes, use in-memory filtering
             return CreateInMemoryFilter(node);
         }
 
-        public KeycloakQueryParams Visit(LogicalNode node)
+        public ScimFilterParams Visit(LogicalNode node)
         {
-            KeycloakQueryParams left = node.Left.Accept(this);
-            KeycloakQueryParams right = node.Right.Accept(this);
+            ScimFilterParams left = node.Left.Accept(this);
+            ScimFilterParams right = node.Right.Accept(this);
 
-            // If either side requires in-memory filtering, combine them
             if (left.InMemoryFilter != null || right.InMemoryFilter != null)
             {
                 return CombineWithInMemoryFilter(left, right, node.Operator);
             }
 
-            // If both sides are simple Keycloak params, we can only use one at a time
-            // Keycloak doesn't support complex AND/OR queries via query params
-            // So we must fall back to in-memory filtering
-            if (HasMultipleKeycloakParams(left) || HasMultipleKeycloakParams(right) ||
-                (HasAnyKeycloakParam(left) && HasAnyKeycloakParam(right)))
+            if (HasMultipleParams(left) || HasMultipleParams(right) ||
+                (HasAnyParam(left) && HasAnyParam(right)))
             {
                 return CombineWithInMemoryFilter(left, right, node.Operator);
             }
 
-            // Merge simple params (only one side has a param)
             return MergeParams(left, right);
         }
 
-        public KeycloakQueryParams Visit(NotNode node)
+        public ScimFilterParams Visit(NotNode node)
         {
-            // Keycloak doesn't support negation in query params
-            // Must use in-memory filtering
-            return new KeycloakQueryParams(
+            return new ScimFilterParams(
                 InMemoryFilter: user => !EvaluateFilter(user, node.InnerExpression));
         }
 
-        public KeycloakQueryParams Visit(PresenceNode node)
+        public ScimFilterParams Visit(PresenceNode node)
         {
-            // Keycloak doesn't support presence checks in query params
-            // Use in-memory filtering
             string normalizedAttr = NormalizeAttributePath(node.AttributePath);
-            return new KeycloakQueryParams(
+            return new ScimFilterParams(
                 InMemoryFilter: user => normalizedAttr switch
                 {
                     "username" => !string.IsNullOrWhiteSpace(user.UserName),
@@ -114,7 +101,6 @@ public sealed class ScimToKeycloakTranslator
 
         private static string NormalizeAttributePath(string attributePath)
         {
-            // Map SCIM attribute paths to lowercase for consistent matching
             return attributePath.ToLowerInvariant() switch
             {
                 "username" => "username",
@@ -127,9 +113,9 @@ public sealed class ScimToKeycloakTranslator
             };
         }
 
-        private static KeycloakQueryParams CreateInMemoryFilter(ComparisonNode node)
+        private static ScimFilterParams CreateInMemoryFilter(ComparisonNode node)
         {
-            return new KeycloakQueryParams(
+            return new ScimFilterParams(
                 InMemoryFilter: user => EvaluateComparison(user, node));
         }
 
@@ -188,105 +174,102 @@ public sealed class ScimToKeycloakTranslator
             };
         }
 
-        private static KeycloakQueryParams CombineWithInMemoryFilter(
-            KeycloakQueryParams left,
-            KeycloakQueryParams right,
+        private static ScimFilterParams CombineWithInMemoryFilter(
+            ScimFilterParams left,
+            ScimFilterParams right,
             string logicOp)
         {
-            // When combining filters with in-memory components, we must fetch all users
-            // and filter in-memory
             Func<ScimUser, bool> combinedFilter = logicOp == "and"
                 ? user => ApplyFilter(user, left) && ApplyFilter(user, right) : user => ApplyFilter(user, left) || ApplyFilter(user, right);
 
-            return new KeycloakQueryParams(InMemoryFilter: combinedFilter);
+            return new ScimFilterParams(InMemoryFilter: combinedFilter);
         }
 
-        private static bool ApplyFilter(ScimUser user, KeycloakQueryParams queryParams)
+        private static bool ApplyFilter(ScimUser user, ScimFilterParams filterParams)
         {
-            if (queryParams.InMemoryFilter != null)
+            if (filterParams.InMemoryFilter != null)
             {
-                return queryParams.InMemoryFilter(user);
+                return filterParams.InMemoryFilter(user);
             }
 
-            // If it's a simple Keycloak param, check if the user matches
             bool matches = true;
 
-            if (queryParams.Username != null)
+            if (filterParams.UserName != null)
             {
-                matches = matches && user.UserName.Equals(queryParams.Username, StringComparison.OrdinalIgnoreCase);
+                matches = matches && user.UserName.Equals(filterParams.UserName, StringComparison.OrdinalIgnoreCase);
             }
 
-            if (queryParams.Email != null)
+            if (filterParams.Email != null)
             {
-                matches = matches && user.Emails?.Any(e => e.Value.Equals(queryParams.Email, StringComparison.OrdinalIgnoreCase)) == true;
+                matches = matches && user.Emails?.Any(e => e.Value.Equals(filterParams.Email, StringComparison.OrdinalIgnoreCase)) == true;
             }
 
-            if (queryParams.FirstName != null)
+            if (filterParams.FirstName != null)
             {
-                matches = matches && user.Name?.GivenName?.Equals(queryParams.FirstName, StringComparison.OrdinalIgnoreCase) == true;
+                matches = matches && user.Name?.GivenName?.Equals(filterParams.FirstName, StringComparison.OrdinalIgnoreCase) == true;
             }
 
-            if (queryParams.LastName != null)
+            if (filterParams.LastName != null)
             {
-                matches = matches && user.Name?.FamilyName?.Equals(queryParams.LastName, StringComparison.OrdinalIgnoreCase) == true;
+                matches = matches && user.Name?.FamilyName?.Equals(filterParams.LastName, StringComparison.OrdinalIgnoreCase) == true;
             }
 
-            if (queryParams.Search != null)
+            if (filterParams.Search != null)
             {
                 matches = matches && (
-                    user.UserName.Contains(queryParams.Search, StringComparison.OrdinalIgnoreCase) ||
-                    user.Emails?.Any(e => e.Value.Contains(queryParams.Search, StringComparison.OrdinalIgnoreCase)) == true ||
-                    user.Name?.GivenName?.Contains(queryParams.Search, StringComparison.OrdinalIgnoreCase) == true ||
-                    user.Name?.FamilyName?.Contains(queryParams.Search, StringComparison.OrdinalIgnoreCase) == true);
+                    user.UserName.Contains(filterParams.Search, StringComparison.OrdinalIgnoreCase) ||
+                    user.Emails?.Any(e => e.Value.Contains(filterParams.Search, StringComparison.OrdinalIgnoreCase)) == true ||
+                    user.Name?.GivenName?.Contains(filterParams.Search, StringComparison.OrdinalIgnoreCase) == true ||
+                    user.Name?.FamilyName?.Contains(filterParams.Search, StringComparison.OrdinalIgnoreCase) == true);
             }
 
             return matches;
         }
 
-        private static bool HasMultipleKeycloakParams(KeycloakQueryParams queryParams)
+        private static bool HasMultipleParams(ScimFilterParams filterParams)
         {
             int count = 0;
-            if (queryParams.Username != null)
+
+            if (filterParams.UserName != null)
             {
                 count++;
             }
 
-            if (queryParams.Email != null)
+            if (filterParams.Email != null)
             {
                 count++;
             }
 
-            if (queryParams.FirstName != null)
+            if (filterParams.FirstName != null)
             {
                 count++;
             }
 
-            if (queryParams.LastName != null)
+            if (filterParams.LastName != null)
             {
                 count++;
             }
 
-            if (queryParams.Search != null)
+            if (filterParams.Search != null)
             {
                 count++;
             }
-
             return count > 1;
         }
 
-        private static bool HasAnyKeycloakParam(KeycloakQueryParams queryParams)
+        private static bool HasAnyParam(ScimFilterParams filterParams)
         {
-            return queryParams.Username != null ||
-                   queryParams.Email != null ||
-                   queryParams.FirstName != null ||
-                   queryParams.LastName != null ||
-                   queryParams.Search != null;
+            return filterParams.UserName != null ||
+                   filterParams.Email != null ||
+                   filterParams.FirstName != null ||
+                   filterParams.LastName != null ||
+                   filterParams.Search != null;
         }
 
-        private static KeycloakQueryParams MergeParams(KeycloakQueryParams left, KeycloakQueryParams right)
+        private static ScimFilterParams MergeParams(ScimFilterParams left, ScimFilterParams right)
         {
-            return new KeycloakQueryParams(
-                Username: left.Username ?? right.Username,
+            return new ScimFilterParams(
+                UserName: left.UserName ?? right.UserName,
                 Email: left.Email ?? right.Email,
                 FirstName: left.FirstName ?? right.FirstName,
                 LastName: left.LastName ?? right.LastName,

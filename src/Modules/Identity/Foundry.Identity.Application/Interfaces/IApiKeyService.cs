@@ -36,6 +36,11 @@ public interface IApiKeyService
     Task<IReadOnlyList<ApiKeyMetadata>> ListApiKeysAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Gets the number of API keys a user currently has.
+    /// </summary>
+    Task<int> GetApiKeyCountAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
     /// Revokes an API key by its ID.
     /// </summary>
     Task<bool> RevokeApiKeyAsync(string keyId, Guid userId, CancellationToken ct = default);

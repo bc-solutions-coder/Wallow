@@ -220,6 +220,21 @@ public sealed partial class RedisApiKeyService(IConnectionMultiplexer redis, ILo
         }
     }
 
+    public async Task<int> GetApiKeyCountAsync(Guid userId, CancellationToken ct = default)
+    {
+        try
+        {
+            IDatabase db = redis.GetDatabase();
+            long count = await db.SetLengthAsync($"{UserKeysPrefix}{userId}");
+            return (int)count;
+        }
+        catch (Exception ex)
+        {
+            LogListApiKeysFailed(ex, userId);
+            return 0;
+        }
+    }
+
     public async Task<bool> RevokeApiKeyAsync(string keyId, Guid userId, CancellationToken ct = default)
     {
         try
@@ -270,8 +285,8 @@ public sealed partial class RedisApiKeyService(IConnectionMultiplexer redis, ILo
                 ? data.ExpiresAt.Value - DateTimeOffset.UtcNow
                 : null;
 
-            await db.StringSetAsync($"{KeyPrefix}{keyHash}", json, expiry, keepTtl: false, When.Always, CommandFlags.None);
-            await db.StringSetAsync($"{KeyPrefix}id:{data.KeyId}", json, expiry, keepTtl: false, When.Always, CommandFlags.None);
+            await db.StringSetAsync($"{KeyPrefix}{keyHash}", json, expiry, keepTtl: false, When.Exists, CommandFlags.None);
+            await db.StringSetAsync($"{KeyPrefix}id:{data.KeyId}", json, expiry, keepTtl: false, When.Exists, CommandFlags.None);
         }
         catch (Exception ex)
         {

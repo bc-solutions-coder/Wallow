@@ -9,6 +9,7 @@ using Foundry.Shared.Kernel.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace Foundry.Identity.Api.Controllers;
 
@@ -19,7 +20,7 @@ namespace Foundry.Identity.Api.Controllers;
 [ApiVersion(1)]
 [Route("api/v{version:apiVersion}/identity/auth/keys")]
 [Authorize]
-public sealed class ApiKeysController(IApiKeyService apiKeyService, ITenantContext tenantContext, ICurrentUserService currentUserService) : ControllerBase
+public sealed class ApiKeysController(IApiKeyService apiKeyService, ITenantContext tenantContext, ICurrentUserService currentUserService, IConfiguration configuration) : ControllerBase
 {
 
     /// <summary>
@@ -90,6 +91,18 @@ public sealed class ApiKeysController(IApiKeyService apiKeyService, ITenantConte
                     Status = StatusCodes.Status400BadRequest
                 });
             }
+        }
+
+        int maxPerUser = configuration.GetValue("ApiKeys:MaxPerUser", 10);
+        int currentCount = await apiKeyService.GetApiKeyCountAsync(userId.Value, ct);
+        if (currentCount >= maxPerUser)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "API key limit reached",
+                Detail = $"You have reached the maximum of {maxPerUser} API keys per user. Revoke an existing key before creating a new one.",
+                Status = StatusCodes.Status400BadRequest
+            });
         }
 
         ApiKeyCreateResult result = await apiKeyService.CreateApiKeyAsync(

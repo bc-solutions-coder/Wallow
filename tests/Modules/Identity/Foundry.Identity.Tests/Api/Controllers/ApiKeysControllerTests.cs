@@ -6,6 +6,7 @@ using Foundry.Identity.Application.Interfaces;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace Foundry.Identity.Tests.Api.Controllers;
 
@@ -28,7 +29,11 @@ public class ApiKeysControllerTests
         _currentUserService = Substitute.For<Foundry.Shared.Kernel.Services.ICurrentUserService>();
         _currentUserService.GetCurrentUserId().Returns(_userId);
 
-        _controller = new ApiKeysController(_apiKeyService, _tenantContext, _currentUserService);
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { { "ApiKeys:MaxPerUser", "10" } })
+            .Build();
+
+        _controller = new ApiKeysController(_apiKeyService, _tenantContext, _currentUserService, configuration);
 
         ClaimsPrincipal user = new(new ClaimsIdentity(new[]
         {

@@ -106,4 +106,44 @@ public class ApiKeyPermissionExpansionTests
     {
         ApiScopes.ValidScopes.Should().Contain(scope);
     }
+
+    [Theory]
+    [InlineData("billing.read", PermissionType.BillingRead)]
+    [InlineData("billing.manage", PermissionType.BillingManage)]
+    [InlineData("invoices.read", PermissionType.InvoicesRead)]
+    [InlineData("invoices.write", PermissionType.InvoicesWrite)]
+    [InlineData("payments.read", PermissionType.PaymentsRead)]
+    [InlineData("payments.write", PermissionType.PaymentsWrite)]
+    [InlineData("users.read", PermissionType.UsersRead)]
+    [InlineData("users.write", PermissionType.UsersUpdate)]
+    [InlineData("roles.read", PermissionType.RolesRead)]
+    [InlineData("storage.read", PermissionType.StorageRead)]
+    [InlineData("storage.write", PermissionType.StorageWrite)]
+    [InlineData("messaging.access", PermissionType.MessagingAccess)]
+    [InlineData("notifications.read", PermissionType.NotificationsRead)]
+    [InlineData("notifications.write", PermissionType.NotificationsWrite)]
+    [InlineData("showcases.read", PermissionType.ShowcasesRead)]
+    [InlineData("showcases.manage", PermissionType.ShowcasesManage)]
+    [InlineData("inquiries.read", PermissionType.InquiriesRead)]
+    [InlineData("inquiries.write", PermissionType.InquiriesWrite)]
+    [InlineData("webhooks.manage", PermissionType.WebhooksManage)]
+    [InlineData("serviceaccounts.read", PermissionType.ServiceAccountsRead)]
+    public void MapScopeToPermission_KnownScope_ReturnsExpectedPermission(string scope, string expectedPermission)
+    {
+        string? result = ScopePermissionMapper.MapScopeToPermission(scope);
+
+        result.Should().Be(expectedPermission);
+    }
+
+    [Theory]
+    [InlineData("unknown.scope")]
+    [InlineData("bogus.permission")]
+    [InlineData("")]
+    [InlineData("not.a.real.scope")]
+    public void MapScopeToPermission_UnknownScope_ReturnsNull(string scope)
+    {
+        string? result = ScopePermissionMapper.MapScopeToPermission(scope);
+
+        result.Should().BeNull();
+    }
 }

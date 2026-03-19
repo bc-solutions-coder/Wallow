@@ -133,7 +133,7 @@ public static class IdentityInfrastructureExtensions
     {
         services.AddMemoryCache();
         services.AddScoped<IUserManagementService, UserManagementService>();
-        services.AddScoped<ITokenService, KeycloakTokenService>();
+
         services.AddScoped<IApiKeyService, RedisApiKeyService>();
         services.AddScoped<IServiceAccountService, OpenIddictServiceAccountService>();
         services.AddScoped<ISsoService, OidcFederationService>();

@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Security.Claims;
-using System.Text.Json;
 using Foundry.Shared.Kernel;
 using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
@@ -25,18 +24,12 @@ public partial class TenantResolutionMiddleware(RequestDelegate next, ILogger<Te
 
         if (context.User.Identity?.IsAuthenticated == true)
         {
-            Claim? orgClaim = context.User.FindFirst("organization");
-            if (orgClaim != null)
+            Claim? orgIdClaim = context.User.FindFirst("org_id");
+            if (orgIdClaim != null && Guid.TryParse(orgIdClaim.Value, out Guid orgId))
             {
-                Guid? orgId = ParseOrganizationId(orgClaim.Value);
-                string orgName = ParseOrganizationName(orgClaim.Value);
-
-                if (orgId.HasValue)
-                {
-                    resolvedTenantId = orgId.Value;
-                    resolvedTenantName = orgName;
-                    LogTenantResolved(orgId, orgName);
-                }
+                resolvedTenantId = orgId;
+                resolvedTenantName = context.User.FindFirst("org_name")?.Value ?? string.Empty;
+                LogTenantResolved(orgId, resolvedTenantName);
             }
 
             // Allow X-Tenant-Id header for realm admins and service accounts
@@ -116,101 +109,8 @@ public partial class TenantResolutionMiddleware(RequestDelegate next, ILogger<Te
 
     private static bool HasRealmAdminRole(ClaimsPrincipal user)
     {
-        // Check standard role claims first (mapped by auth middleware)
-        if (user.FindAll(ClaimTypes.Role).Any(c =>
-                string.Equals(c.Value, AdminRole, StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
-        // Fallback: parse Keycloak realm_access claim directly
-        string? realmAccess = user.FindFirst("realm_access")?.Value;
-        if (string.IsNullOrEmpty(realmAccess))
-        {
-            return false;
-        }
-
-        try
-        {
-            JsonElement parsed = JsonSerializer.Deserialize<JsonElement>(realmAccess);
-            if (parsed.TryGetProperty("roles", out JsonElement rolesArray))
-            {
-                return rolesArray.EnumerateArray()
-                    .Any(r => string.Equals(r.GetString(), AdminRole, StringComparison.OrdinalIgnoreCase));
-            }
-        }
-        catch (JsonException)
-        {
-            // Invalid JSON, deny admin access
-        }
-
-        return false;
-    }
-
-    private static Guid? ParseOrganizationId(string organizationClaimValue)
-    {
-        if (string.IsNullOrWhiteSpace(organizationClaimValue))
-        {
-            return null;
-        }
-
-        // Try simple GUID format first
-        if (Guid.TryParse(organizationClaimValue, out Guid simpleGuid))
-        {
-            return simpleGuid;
-        }
-
-        // Try Keycloak 26+ JSON format: {"orgId": {"name": "orgName"}}
-        try
-        {
-            JsonElement json = JsonSerializer.Deserialize<JsonElement>(organizationClaimValue);
-
-            // The organization ID is the property name, not a value
-            foreach (JsonProperty property in json.EnumerateObject())
-            {
-                if (Guid.TryParse(property.Name, out Guid orgId))
-                {
-                    return orgId;
-                }
-            }
-        }
-        catch (JsonException)
-        {
-            // Not valid JSON, fall through
-        }
-
-        return null;
-    }
-
-    private static string ParseOrganizationName(string organizationClaimValue)
-    {
-        if (string.IsNullOrWhiteSpace(organizationClaimValue))
-        {
-            return string.Empty;
-        }
-
-        // Try Keycloak 26+ JSON format: {"orgId": {"name": "orgName"}}
-        try
-        {
-            JsonElement json = JsonSerializer.Deserialize<JsonElement>(organizationClaimValue);
-
-            // The organization name is inside the nested object
-            foreach (JsonProperty property in json.EnumerateObject())
-            {
-                if (property.Value.ValueKind == JsonValueKind.Object &&
-                    property.Value.TryGetProperty("name", out JsonElement nameElement))
-                {
-                    return nameElement.GetString() ?? string.Empty;
-                }
-            }
-        }
-        catch (JsonException)
-        {
-            // Not valid JSON, return the raw value as name
-            return organizationClaimValue;
-        }
-
-        return string.Empty;
+        return user.FindAll(ClaimTypes.Role).Any(c =>
+            string.Equals(c.Value, AdminRole, StringComparison.OrdinalIgnoreCase));
     }
 }
 

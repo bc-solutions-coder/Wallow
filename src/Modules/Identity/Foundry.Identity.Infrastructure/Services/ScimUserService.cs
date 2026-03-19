@@ -1,32 +1,27 @@
 using System.Globalization;
-using System.Net;
-using System.Net.Http.Json;
 using Foundry.Identity.Application.DTOs;
-using Foundry.Identity.Application.Exceptions;
 using Foundry.Identity.Application.Interfaces;
 using Foundry.Identity.Domain.Entities;
 using Foundry.Identity.Domain.Enums;
-using Foundry.Identity.Infrastructure.Extensions;
 using Foundry.Identity.Infrastructure.Scim;
 using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Foundry.Identity.Infrastructure.Services;
 
 public sealed partial class ScimUserService(
-    IHttpClientFactory httpClientFactory,
+    UserManager<FoundryUser> userManager,
+    RoleManager<FoundryRole> roleManager,
+    IOrganizationService organizationService,
     IScimConfigurationRepository scimRepository,
     IScimSyncLogRepository syncLogRepository,
     ITenantContext tenantContext,
-    IOptions<KeycloakOptions> keycloakOptions,
     ILogger<ScimUserService> logger,
     TimeProvider timeProvider)
 {
-    private readonly HttpClient _httpClient = httpClientFactory.CreateClient("KeycloakAdminClient");
-    private readonly string _realm = keycloakOptions.Value.Realm;
-
     public async Task<ScimUser> CreateUserAsync(ScimUserRequest request, CancellationToken ct = default)
     {
         TenantId tenantId = tenantContext.TenantId;
@@ -37,37 +32,34 @@ public sealed partial class ScimUserService(
         try
         {
             string email = request.Emails?.FirstOrDefault(e => e.Primary)?.Value ?? request.UserName;
+            string firstName = request.Name?.GivenName ?? string.Empty;
+            string lastName = request.Name?.FamilyName ?? string.Empty;
 
-            UserRepresentation userRepresentation = new()
+            FoundryUser user = FoundryUser.Create(
+                tenantId.Value,
+                string.IsNullOrWhiteSpace(firstName) ? "SCIM" : firstName,
+                string.IsNullOrWhiteSpace(lastName) ? "User" : lastName,
+                email,
+                timeProvider);
+
+            user.UserName = request.UserName;
+
+            IdentityResult result = await userManager.CreateAsync(user);
+            if (!result.Succeeded)
             {
-                Username = request.UserName,
-                Email = email,
-                FirstName = request.Name?.GivenName,
-                LastName = request.Name?.FamilyName,
-                Enabled = request.Active,
-                Attributes = new Dictionary<string, ICollection<string>>
+                string errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                if (result.Errors.Any(e => e.Code == "DuplicateUserName" || e.Code == "DuplicateEmail"))
                 {
-                    ["scim_external_id"] = new[] { externalId }
+                    throw new InvalidOperationException($"User '{request.UserName}' already exists");
                 }
-            };
 
-            HttpResponseMessage response = await _httpClient.PostAsJsonAsync(
-                $"/admin/realms/{_realm}/users",
-                userRepresentation,
-                ct);
-
-            if (response.StatusCode == HttpStatusCode.Conflict)
-            {
-                throw new KeycloakConflictException($"User '{request.UserName}' already exists");
+                throw new InvalidOperationException($"Failed to create user: {errors}");
             }
 
-            await response.EnsureSuccessOrThrowAsync();
+            string userId = user.Id.ToString();
 
-            string? locationHeader = response.Headers.Location?.ToString();
-            string userId = locationHeader?.Split('/').Last() ?? throw new InvalidOperationException("User created but Location header is missing");
-
-            await AddUserToOrganizationAsync(userId, ct);
-            await AssignDefaultRoleAsync(userId, ct);
+            await AddUserToOrganizationAsync(user.Id, ct);
+            await AssignDefaultRoleAsync(user.Id, ct);
             await LogSyncAsync(ScimOperation.Create, ScimResourceType.User, externalId, userId, true, ct: ct);
 
             LogScimUserCreated(request.UserName, userId);
@@ -90,26 +82,34 @@ public sealed partial class ScimUserService(
 
         try
         {
+            FoundryUser? user = await userManager.FindByIdAsync(id);
+            if (user is null)
+            {
+                throw new InvalidOperationException($"User '{id}' not found");
+            }
+
             string email = request.Emails?.FirstOrDefault(e => e.Primary)?.Value ?? request.UserName;
 
-            UserRepresentation userRepresentation = new()
-            {
-                Username = request.UserName,
-                Email = email,
-                FirstName = request.Name?.GivenName,
-                LastName = request.Name?.FamilyName,
-                Enabled = request.Active,
-                Attributes = new Dictionary<string, ICollection<string>>
-                {
-                    ["scim_external_id"] = new[] { externalId }
-                }
-            };
+            user.UserName = request.UserName;
+            user.Email = email;
 
-            HttpResponseMessage response = await _httpClient.PutAsJsonAsync(
-                $"/admin/realms/{_realm}/users/{id}",
-                userRepresentation,
-                ct);
-            await response.EnsureSuccessOrThrowAsync();
+            IdentityResult result = await userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                string errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Failed to update user: {errors}");
+            }
+
+            if (!request.Active)
+            {
+                await userManager.SetLockoutEnabledAsync(user, true);
+                await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
+            }
+            else
+            {
+                await userManager.SetLockoutEnabledAsync(user, false);
+                await userManager.SetLockoutEndDateAsync(user, null);
+            }
 
             await LogSyncAsync(ScimOperation.Update, ScimResourceType.User, externalId, id, true, ct: ct);
 
@@ -131,28 +131,42 @@ public sealed partial class ScimUserService(
 
         try
         {
-            HttpResponseMessage response = await _httpClient.GetAsync($"/admin/realms/{_realm}/users/{id}", ct);
-            await response.EnsureSuccessOrThrowAsync();
-            ScimKeycloakUserRepresentation? currentUser = await response.Content.ReadFromJsonAsync<ScimKeycloakUserRepresentation>(ct);
-
-            if (currentUser == null)
+            FoundryUser? user = await userManager.FindByIdAsync(id);
+            if (user is null)
             {
                 throw new InvalidOperationException($"User {id} not found");
             }
 
+            bool activeChanged = false;
+            bool? newActiveState = null;
+
             foreach (ScimPatchOperation op in request.Operations)
             {
-                ApplyPatchOperation(currentUser, op);
+                ApplyPatchOperation(user, op, ref activeChanged, ref newActiveState);
             }
 
-            HttpResponseMessage updateResponse = await _httpClient.PutAsJsonAsync(
-                $"/admin/realms/{_realm}/users/{id}",
-                currentUser,
-                ct);
-            await updateResponse.EnsureSuccessOrThrowAsync();
+            IdentityResult result = await userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                string errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Failed to patch user: {errors}");
+            }
 
-            string externalId = currentUser.Attributes?.GetValueOrDefault("scim_external_id")?.FirstOrDefault() ?? id;
-            await LogSyncAsync(ScimOperation.Patch, ScimResourceType.User, externalId, id, true, ct: ct);
+            if (activeChanged && newActiveState.HasValue)
+            {
+                if (!newActiveState.Value)
+                {
+                    await userManager.SetLockoutEnabledAsync(user, true);
+                    await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
+                }
+                else
+                {
+                    await userManager.SetLockoutEnabledAsync(user, false);
+                    await userManager.SetLockoutEndDateAsync(user, null);
+                }
+            }
+
+            await LogSyncAsync(ScimOperation.Patch, ScimResourceType.User, id, id, true, ct: ct);
 
             LogScimUserPatched(id);
 
@@ -172,22 +186,29 @@ public sealed partial class ScimUserService(
 
         try
         {
+            FoundryUser? user = await userManager.FindByIdAsync(id);
+            if (user is null)
+            {
+                throw new InvalidOperationException($"User '{id}' not found");
+            }
+
             ScimConfiguration? config = await scimRepository.GetAsync(ct);
 
             if (config?.DeprovisionOnDelete == true)
             {
-                HttpResponseMessage response = await _httpClient.DeleteAsync($"/admin/realms/{_realm}/users/{id}", ct);
-                await response.EnsureSuccessOrThrowAsync();
+                IdentityResult result = await userManager.DeleteAsync(user);
+                if (!result.Succeeded)
+                {
+                    string errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException($"Failed to delete user: {errors}");
+                }
+
                 LogScimUserDeleted(id);
             }
             else
             {
-                UserRepresentation disableRequest = new() { Enabled = false };
-                HttpResponseMessage response = await _httpClient.PutAsJsonAsync(
-                    $"/admin/realms/{_realm}/users/{id}",
-                    disableRequest,
-                    ct);
-                await response.EnsureSuccessOrThrowAsync();
+                await userManager.SetLockoutEnabledAsync(user, true);
+                await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
                 LogScimUserDisabled(id);
             }
 
@@ -201,23 +222,17 @@ public sealed partial class ScimUserService(
         }
     }
 
-    public async Task<ScimUser?> GetUserAsync(string id, CancellationToken ct = default)
+    public async Task<ScimUser?> GetUserAsync(string id, CancellationToken _ = default)
     {
         try
         {
-            HttpResponseMessage response = await _httpClient.GetAsync($"/admin/realms/{_realm}/users/{id}", ct);
-            if (!response.IsSuccessStatusCode)
+            FoundryUser? user = await userManager.FindByIdAsync(id);
+            if (user is null)
             {
                 return null;
             }
 
-            ScimKeycloakUserRepresentation? user = await response.Content.ReadFromJsonAsync<ScimKeycloakUserRepresentation>(ct);
-            if (user == null)
-            {
-                return null;
-            }
-
-            return MapToScimUser(user, id);
+            return MapToScimUser(user);
         }
         catch (Exception ex)
         {
@@ -228,90 +243,87 @@ public sealed partial class ScimUserService(
 
     public async Task<ScimListResponse<ScimUser>> ListUsersAsync(ScimListRequest request, CancellationToken ct = default)
     {
-        int first = Math.Max(0, request.StartIndex - 1);
-        int max = Math.Min(request.Count, ScimConstants.MaxPageSize);
+        int skip = Math.Max(0, request.StartIndex - 1);
+        int take = Math.Min(request.Count, ScimConstants.MaxPageSize);
 
-        ScimToKeycloakTranslator translator = new();
-        KeycloakQueryParams keycloakParams = translator.Translate(request.Filter);
+        IQueryable<FoundryUser> query = userManager.Users;
 
-        List<string> queryParams =
-        [
-            $"first={first}",
-            $"max={max}"
-        ];
+        ScimAttributeMapper mapper = new();
+        ScimFilterParams filterParams = mapper.Translate(request.Filter);
 
-        if (keycloakParams.Username != null)
+        if (filterParams.UserName != null)
         {
-            queryParams.Add($"username={Uri.EscapeDataString(keycloakParams.Username)}");
+            string username = filterParams.UserName;
+            query = query.Where(u => u.UserName != null && EF.Functions.ILike(u.UserName, username));
         }
 
-        if (keycloakParams.Email != null)
+        if (filterParams.Email != null)
         {
-            queryParams.Add($"email={Uri.EscapeDataString(keycloakParams.Email)}");
+            string email = filterParams.Email;
+            query = query.Where(u => u.Email != null && EF.Functions.ILike(u.Email, email));
         }
 
-        if (keycloakParams.FirstName != null)
+        if (filterParams.FirstName != null)
         {
-            queryParams.Add($"firstName={Uri.EscapeDataString(keycloakParams.FirstName)}");
+            string pattern = $"%{filterParams.FirstName}%";
+            query = query.Where(u => EF.Functions.ILike(u.FirstName, pattern));
         }
 
-        if (keycloakParams.LastName != null)
+        if (filterParams.LastName != null)
         {
-            queryParams.Add($"lastName={Uri.EscapeDataString(keycloakParams.LastName)}");
+            string pattern = $"%{filterParams.LastName}%";
+            query = query.Where(u => EF.Functions.ILike(u.LastName, pattern));
         }
 
-        if (keycloakParams.Search != null)
+        if (filterParams.Search != null)
         {
-            queryParams.Add($"search={Uri.EscapeDataString(keycloakParams.Search)}");
+            string pattern = $"%{filterParams.Search}%";
+            query = query.Where(u =>
+                (u.Email != null && EF.Functions.ILike(u.Email, pattern)) ||
+                EF.Functions.ILike(u.FirstName, pattern) ||
+                EF.Functions.ILike(u.LastName, pattern) ||
+                (u.UserName != null && EF.Functions.ILike(u.UserName, pattern)));
         }
 
-        string queryString = string.Join("&", queryParams);
-        HttpResponseMessage response = await _httpClient.GetAsync($"/admin/realms/{_realm}/users?{queryString}", ct);
-        await response.EnsureSuccessOrThrowAsync();
+        int totalCount = await query.CountAsync(ct);
 
-        List<ScimKeycloakUserRepresentation>? users = await response.Content.ReadFromJsonAsync<List<ScimKeycloakUserRepresentation>>(ct);
+        List<FoundryUser> users = await query
+            .OrderBy(u => u.Email)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(ct);
 
-        List<ScimUser> scimUsers = users?.Select(u => MapToScimUser(u, u.Id ?? "")).ToList() ?? [];
+        List<ScimUser> scimUsers = users.Select(MapToScimUser).ToList();
 
-        if (keycloakParams.InMemoryFilter != null)
+        if (filterParams.InMemoryFilter != null)
         {
-            scimUsers = scimUsers.Where(keycloakParams.InMemoryFilter).ToList();
+            scimUsers = scimUsers.Where(filterParams.InMemoryFilter).ToList();
         }
-
-        HttpResponseMessage countResponse = await _httpClient.GetAsync($"/admin/realms/{_realm}/users/count", ct);
-        int totalCount = await countResponse.Content.ReadFromJsonAsync<int>(ct);
 
         return new ScimListResponse<ScimUser>
         {
-            TotalResults = keycloakParams.InMemoryFilter != null ? scimUsers.Count : totalCount,
+            TotalResults = filterParams.InMemoryFilter != null ? scimUsers.Count : totalCount,
             StartIndex = request.StartIndex,
             ItemsPerPage = scimUsers.Count,
             Resources = scimUsers
         };
     }
 
-    private async Task AddUserToOrganizationAsync(string userId, CancellationToken ct)
+    private async Task AddUserToOrganizationAsync(Guid userId, CancellationToken ct)
     {
         TenantId tenantId = tenantContext.TenantId;
 
         try
         {
-            HttpResponseMessage response = await _httpClient.PostAsJsonAsync(
-                $"/admin/realms/{_realm}/organizations/{tenantId.Value}/members",
-                new { id = userId },
-                ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                LogAddUserToOrgFailed(userId, tenantId.Value);
-            }
+            await organizationService.AddMemberAsync(tenantId.Value, userId, ct);
         }
         catch (Exception ex)
         {
-            LogAddUserToOrgException(ex, userId);
+            LogAddUserToOrgException(ex, userId.ToString());
         }
     }
 
-    private async Task AssignDefaultRoleAsync(string userId, CancellationToken ct)
+    private async Task AssignDefaultRoleAsync(Guid userId, CancellationToken ct)
     {
         ScimConfiguration? config = await scimRepository.GetAsync(ct);
         if (string.IsNullOrWhiteSpace(config?.DefaultRole))
@@ -321,24 +333,29 @@ public sealed partial class ScimUserService(
 
         try
         {
-            HttpResponseMessage roleResponse = await _httpClient.GetAsync($"/admin/realms/{_realm}/roles/{config.DefaultRole}", ct);
-            if (!roleResponse.IsSuccessStatusCode)
+            bool roleExists = await roleManager.RoleExistsAsync(config.DefaultRole);
+            if (!roleExists)
             {
                 LogDefaultRoleNotFound(config.DefaultRole);
                 return;
             }
 
-            ScimKeycloakRoleRepresentation? role = await roleResponse.Content.ReadFromJsonAsync<ScimKeycloakRoleRepresentation>(ct);
+            FoundryUser? user = await userManager.FindByIdAsync(userId.ToString());
+            if (user is null)
+            {
+                return;
+            }
 
-            HttpResponseMessage assignResponse = await _httpClient.PostAsJsonAsync(
-                $"/admin/realms/{_realm}/users/{userId}/role-mappings/realm",
-                new[] { role },
-                ct);
-            await assignResponse.EnsureSuccessOrThrowAsync();
+            IdentityResult result = await userManager.AddToRoleAsync(user, config.DefaultRole);
+            if (!result.Succeeded)
+            {
+                string errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                LogAssignDefaultRoleFailed(null!, config.DefaultRole, userId.ToString());
+            }
         }
         catch (Exception ex)
         {
-            LogAssignDefaultRoleFailed(ex, config.DefaultRole, userId);
+            LogAssignDefaultRoleFailed(ex, config.DefaultRole, userId.ToString());
         }
     }
 
@@ -381,7 +398,7 @@ public sealed partial class ScimUserService(
         }
     }
 
-    private static void ApplyPatchOperation(ScimKeycloakUserRepresentation user, ScimPatchOperation op)
+    private static void ApplyPatchOperation(FoundryUser user, ScimPatchOperation op, ref bool activeChanged, ref bool? newActiveState)
     {
         string? path = op.Path?.ToLowerInvariant();
 
@@ -392,17 +409,13 @@ public sealed partial class ScimUserService(
                 switch (path)
                 {
                     case "active":
-                        user.Enabled = op.Value is bool b ? b : bool.Parse(Convert.ToString(op.Value, CultureInfo.InvariantCulture) ?? "true");
+                        bool active = op.Value is bool b ? b : bool.Parse(Convert.ToString(op.Value, CultureInfo.InvariantCulture) ?? "true");
+                        activeChanged = true;
+                        newActiveState = active;
                         break;
                     case "username":
                     case "userName":
-                        user.Username = Convert.ToString(op.Value, CultureInfo.InvariantCulture);
-                        break;
-                    case "name.givenname":
-                        user.FirstName = Convert.ToString(op.Value, CultureInfo.InvariantCulture);
-                        break;
-                    case "name.familyname":
-                        user.LastName = Convert.ToString(op.Value, CultureInfo.InvariantCulture);
+                        user.UserName = Convert.ToString(op.Value, CultureInfo.InvariantCulture);
                         break;
                     case "emails":
                     case "emails[type eq \"work\"].value":
@@ -416,15 +429,15 @@ public sealed partial class ScimUserService(
         }
     }
 
-    private static ScimUser MapToScimUser(ScimKeycloakUserRepresentation user, string id)
+    private static ScimUser MapToScimUser(FoundryUser user)
     {
-        string? externalId = user.Attributes?.GetValueOrDefault("scim_external_id")?.FirstOrDefault();
+        string id = user.Id.ToString();
 
         return new ScimUser
         {
             Id = id,
-            ExternalId = externalId,
-            UserName = user.Username ?? user.Email ?? string.Empty,
+            ExternalId = id,
+            UserName = user.UserName ?? user.Email ?? string.Empty,
             Name = new ScimName
             {
                 GivenName = user.FirstName,
@@ -432,16 +445,16 @@ public sealed partial class ScimUserService(
                 Formatted = $"{user.FirstName} {user.LastName}".Trim()
             },
             DisplayName = $"{user.FirstName} {user.LastName}".Trim(),
-            Emails = string.IsNullOrWhiteSpace(user.Email) ? null : new[]
-            {
+            Emails = string.IsNullOrWhiteSpace(user.Email) ? null :
+            [
                 new ScimEmail
                 {
                     Value = user.Email,
                     Type = "work",
                     Primary = true
                 }
-            },
-            Active = user.Enabled ?? true,
+            ],
+            Active = user.IsActive && !user.LockoutEnabled,
             Meta = new ScimMeta
             {
                 ResourceType = "User",
@@ -491,9 +504,6 @@ public sealed partial class ScimUserService(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to get SCIM user {UserId}")]
     private partial void LogGetScimUserFailed(Exception ex, string userId);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not add user {UserId} to organization {OrgId}")]
-    private partial void LogAddUserToOrgFailed(string userId, Guid orgId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to add user {UserId} to organization")]
     private partial void LogAddUserToOrgException(Exception ex, string userId);

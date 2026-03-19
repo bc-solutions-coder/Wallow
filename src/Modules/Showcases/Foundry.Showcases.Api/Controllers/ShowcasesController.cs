@@ -29,7 +29,6 @@ public class ShowcasesController(IMessageBus bus) : ControllerBase
 {
 
     [HttpGet]
-    [AllowAnonymous]
     [ProducesResponseType(typeof(IReadOnlyList<ShowcaseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] ShowcaseCategory? category,
@@ -43,7 +42,6 @@ public class ShowcasesController(IMessageBus bus) : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    [AllowAnonymous]
     [ProducesResponseType(typeof(ShowcaseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)

@@ -42,27 +42,6 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  keycloak:
-    command: start --optimized
-    environment:
-      KC_DB: postgres
-      KC_DB_URL: ${KC_DB_URL}
-      KC_DB_USERNAME: ${KC_DB_USERNAME}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
-      KC_HEALTH_ENABLED: "true"
-      KC_METRICS_ENABLED: "true"
-      KC_HOSTNAME: ${KC_HOSTNAME}
-      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/tls.crt
-      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/tls.key
-    ports: !reset []
-    volumes:
-      - keycloak_certs:/opt/keycloak/certs:ro
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "5"
-
   # No Mailpit in production - use real SMTP service
 
   foundry-api:
@@ -86,5 +65,4 @@ services:
         max-size: "10m"
         max-file: "3"
 
-volumes:
-  keycloak_certs:
+volumes: {}

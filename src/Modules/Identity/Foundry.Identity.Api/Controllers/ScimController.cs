@@ -2,7 +2,7 @@
 using System.Text.Json.Serialization;
 using Asp.Versioning;
 using Foundry.Identity.Application.DTOs;
-
+using Foundry.Identity.Application.Exceptions;
 using Foundry.Identity.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;

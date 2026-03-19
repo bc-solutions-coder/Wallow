@@ -1,5 +1,4 @@
 using Foundry.Identity.Application.DTOs;
-using Foundry.Identity.Application.Exceptions;
 using Foundry.Identity.Application.Settings;
 using Foundry.Identity.Domain.Enums;
 using Foundry.Identity.Domain.Identity;
@@ -42,45 +41,6 @@ public class ApplicationMissingCoverageTests
     {
         IdentitySettingKeys keys = new();
         keys.ModuleName.Should().Be("identity");
-    }
-
-    #endregion
-
-    #region KeycloakConflictException
-
-    [Fact]
-    public void KeycloakConflictException_DefaultConstructor_CreatesException()
-    {
-        KeycloakConflictException ex = new();
-
-        ex.Should().NotBeNull();
-        ex.Message.Should().NotBeNull();
-    }
-
-    [Fact]
-    public void KeycloakConflictException_WithMessage_SetsMessage()
-    {
-        KeycloakConflictException ex = new("User already exists");
-
-        ex.Message.Should().Be("User already exists");
-    }
-
-    [Fact]
-    public void KeycloakConflictException_WithMessageAndInnerException_SetsAllFields()
-    {
-        InvalidOperationException inner = new("inner");
-        KeycloakConflictException ex = new("Conflict occurred", inner);
-
-        ex.Message.Should().Be("Conflict occurred");
-        ex.InnerException.Should().Be(inner);
-    }
-
-    [Fact]
-    public void KeycloakConflictException_IsException()
-    {
-        KeycloakConflictException ex = new("test");
-
-        ex.Should().BeAssignableTo<Exception>();
     }
 
     #endregion

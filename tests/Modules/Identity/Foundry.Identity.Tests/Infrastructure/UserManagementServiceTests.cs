@@ -2,11 +2,12 @@ using Foundry.Identity.Application.DTOs;
 using Foundry.Identity.Domain.Entities;
 using Foundry.Identity.Infrastructure.Services;
 using Foundry.Shared.Contracts.Identity.Events;
+using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.TimeProvider.Testing;
+using Microsoft.Extensions.Time.Testing;
 using Wolverine;
 
 namespace Foundry.Identity.Tests.Infrastructure;

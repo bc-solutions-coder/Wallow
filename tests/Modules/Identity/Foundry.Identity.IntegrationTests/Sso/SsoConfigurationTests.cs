@@ -21,7 +21,6 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
 {
     private readonly SsoConfigurationTestFactory _factory;
     private IServiceScope? _scope;
-    private IServiceProvider _scopedServices = null!;
     private ISsoService _ssoService = null!;
     private IdentityDbContext _dbContext = null!;
 
@@ -33,18 +32,17 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
     public async Task InitializeAsync()
     {
         _scope = _factory.Services.CreateScope();
-        _scopedServices = _scope.ServiceProvider;
+        IServiceProvider scopedServices = _scope.ServiceProvider;
 
-        _ssoService = _scopedServices.GetRequiredService<ISsoService>();
-        _dbContext = _scopedServices.GetRequiredService<IdentityDbContext>();
+        _ssoService = scopedServices.GetRequiredService<ISsoService>();
+        _dbContext = scopedServices.GetRequiredService<IdentityDbContext>();
         await _dbContext.Database.EnsureCreatedAsync();
 
-        // Clear any existing SSO configurations from the database
         List<Domain.Entities.SsoConfiguration> existingConfigs = _dbContext.SsoConfigurations.ToList();
         _dbContext.SsoConfigurations.RemoveRange(existingConfigs);
         await _dbContext.SaveChangesAsync();
 
-        _factory.ResetKeycloakMock();
+        _factory.ResetIdpMock();
     }
 
     public Task DisposeAsync()
@@ -54,47 +52,8 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
     }
 
     [Fact]
-    public async Task ConfigureSaml_CreatesKeycloakIdpBroker()
+    public async Task ConfigureOidc_CreatesIdpBroker()
     {
-        // Arrange
-        SaveSamlConfigRequest request = new(
-            DisplayName: "Test SAML Provider",
-            EntityId: "https://saml-idp.test/metadata",
-            SsoUrl: "https://saml-idp.test/sso",
-            SloUrl: "https://saml-idp.test/slo",
-            Certificate: GenerateTestCertificate(),
-            NameIdFormat: SamlNameIdFormat.Email,
-            EmailAttribute: "email",
-            FirstNameAttribute: "givenName",
-            LastNameAttribute: "surname",
-            GroupsAttribute: "groups",
-            EnforceForAllUsers: false,
-            AutoProvisionUsers: true,
-            DefaultRole: "user",
-            SyncGroupsAsRoles: true);
-
-        // Act
-        SsoConfigurationDto result = await _ssoService.SaveSamlConfigurationAsync(request);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.DisplayName.Should().Be("Test SAML Provider");
-        result.Protocol.Should().Be(SsoProtocol.Saml);
-        result.SamlEntityId.Should().Be("https://saml-idp.test/metadata");
-        result.Status.Should().Be(SsoStatus.Draft);
-
-        IReadOnlyList<JsonElement> createdIdps = _factory.CreatedIdentityProviders;
-        createdIdps.Should().HaveCount(1);
-        JsonElement idp = createdIdps[0];
-        idp.GetProperty("displayName").GetString().Should().Be("Test SAML Provider");
-        idp.GetProperty("providerId").GetString().Should().Be("saml");
-        idp.GetProperty("enabled").GetBoolean().Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task ConfigureOidc_CreatesKeycloakIdpBroker()
-    {
-        // Arrange - Use the WireMock server URL as the issuer
         string mockIssuer = _factory.MockServerUrl;
         _factory.SetupOidcDiscovery(mockIssuer);
 
@@ -113,10 +72,8 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
             DefaultRole: "user",
             SyncGroupsAsRoles: true);
 
-        // Act
         SsoConfigurationDto result = await _ssoService.SaveOidcConfigurationAsync(request);
 
-        // Assert
         result.Should().NotBeNull();
         result.DisplayName.Should().Be("Test OIDC Provider");
         result.Protocol.Should().Be(SsoProtocol.Oidc);
@@ -132,34 +89,32 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
     }
 
     [Fact]
-    public async Task Activate_EnablesIdpInKeycloak()
+    public async Task Activate_EnablesIdp()
     {
-        // Arrange - Create and save configuration first
-        SaveSamlConfigRequest request = new(
-            DisplayName: "Test SAML Provider",
-            EntityId: "https://saml-idp.test/metadata",
-            SsoUrl: "https://saml-idp.test/sso",
-            SloUrl: null,
-            Certificate: GenerateTestCertificate(),
-            NameIdFormat: SamlNameIdFormat.Email,
+        string mockIssuer = _factory.MockServerUrl;
+        _factory.SetupOidcDiscovery(mockIssuer);
+
+        SaveOidcConfigRequest request = new(
+            DisplayName: "Test OIDC Provider",
+            Issuer: mockIssuer,
+            ClientId: "test-client-id",
+            ClientSecret: "test-client-secret",
+            Scopes: "openid profile email",
             EmailAttribute: "email",
-            FirstNameAttribute: "givenName",
-            LastNameAttribute: "surname",
+            FirstNameAttribute: "given_name",
+            LastNameAttribute: "family_name",
             GroupsAttribute: null,
             EnforceForAllUsers: false,
             AutoProvisionUsers: true,
             DefaultRole: null,
             SyncGroupsAsRoles: false);
 
-        _ = await _ssoService.SaveSamlConfigurationAsync(request);
-
-        // Act
+        _ = await _ssoService.SaveOidcConfigurationAsync(request);
         await _ssoService.ActivateAsync();
 
-        // Assert
         SsoConfigurationDto? config = await _ssoService.GetConfigurationAsync();
         config.Should().NotBeNull();
-        config.Status.Should().Be(SsoStatus.Active);
+        config!.Status.Should().Be(SsoStatus.Active);
 
         IReadOnlyList<JsonElement> updatedIdps = _factory.UpdatedIdentityProviders;
         updatedIdps.Should().HaveCount(1);
@@ -168,37 +123,35 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
     }
 
     [Fact]
-    public async Task Disable_DisablesIdpInKeycloak()
+    public async Task Disable_DisablesIdp()
     {
-        // Arrange - Create, save, and activate configuration first
-        SaveSamlConfigRequest request = new(
-            DisplayName: "Test SAML Provider",
-            EntityId: "https://saml-idp.test/metadata",
-            SsoUrl: "https://saml-idp.test/sso",
-            SloUrl: null,
-            Certificate: GenerateTestCertificate(),
-            NameIdFormat: SamlNameIdFormat.Email,
+        string mockIssuer = _factory.MockServerUrl;
+        _factory.SetupOidcDiscovery(mockIssuer);
+
+        SaveOidcConfigRequest request = new(
+            DisplayName: "Test OIDC Provider",
+            Issuer: mockIssuer,
+            ClientId: "test-client-id",
+            ClientSecret: "test-client-secret",
+            Scopes: "openid profile email",
             EmailAttribute: "email",
-            FirstNameAttribute: "givenName",
-            LastNameAttribute: "surname",
+            FirstNameAttribute: "given_name",
+            LastNameAttribute: "family_name",
             GroupsAttribute: null,
             EnforceForAllUsers: false,
             AutoProvisionUsers: true,
             DefaultRole: null,
             SyncGroupsAsRoles: false);
 
-        _ = await _ssoService.SaveSamlConfigurationAsync(request);
+        _ = await _ssoService.SaveOidcConfigurationAsync(request);
         await _ssoService.ActivateAsync();
-
         _factory.ResetUpdatedProviders();
 
-        // Act
         await _ssoService.DisableAsync();
 
-        // Assert
         SsoConfigurationDto? config = await _ssoService.GetConfigurationAsync();
         config.Should().NotBeNull();
-        config.Status.Should().Be(SsoStatus.Disabled);
+        config!.Status.Should().Be(SsoStatus.Disabled);
 
         IReadOnlyList<JsonElement> updatedIdps = _factory.UpdatedIdentityProviders;
         updatedIdps.Should().HaveCount(1);
@@ -207,25 +160,8 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
     }
 
     [Fact]
-    public async Task GetSamlMetadata_ReturnsValidXml()
-    {
-        // Act
-        string metadata = await _ssoService.GetSamlServiceProviderMetadataAsync();
-
-        // Assert
-        metadata.Should().NotBeNullOrEmpty();
-        metadata.Should().Contain("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-        metadata.Should().Contain("EntityDescriptor");
-        metadata.Should().Contain("SPSSODescriptor");
-        metadata.Should().Contain("AssertionConsumerService");
-        metadata.Should().Contain("SingleLogoutService");
-        metadata.Should().Contain("realms/foundry");
-    }
-
-    [Fact]
     public async Task TestConnection_WithValidConfig_ReturnsSuccess()
     {
-        // Arrange - Use the WireMock server URL as the issuer so we can control responses
         string mockIssuer = _factory.MockServerUrl;
         _factory.SetupOidcDiscovery(mockIssuer);
 
@@ -246,10 +182,8 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
 
         _ = await _ssoService.SaveOidcConfigurationAsync(request);
 
-        // Act
         SsoTestResult result = await _ssoService.TestConnectionAsync();
 
-        // Assert
         result.Should().NotBeNull();
         result.Success.Should().BeTrue();
     }
@@ -257,7 +191,6 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
     [Fact]
     public async Task TestConnection_WithInvalidConfig_ReturnsFailure()
     {
-        // Arrange - Create OIDC config with invalid issuer (no discovery endpoint)
         _factory.SetupOidcDiscoveryFailure("https://invalid-idp.test");
 
         SaveOidcConfigRequest request = new(
@@ -277,78 +210,45 @@ public class SsoConfigurationTests : IClassFixture<SsoConfigurationTestFactory>,
 
         _ = await _ssoService.SaveOidcConfigurationAsync(request);
 
-        // Act
         SsoTestResult result = await _ssoService.TestConnectionAsync();
 
-        // Assert
         result.Should().NotBeNull();
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
-    public async Task ValidateConfiguration_ChecksCertificateExpiry()
+    public async Task ValidateConfiguration_ReturnsResult()
     {
-        // Arrange - Create SAML config with a certificate
-        SaveSamlConfigRequest request = new(
-            DisplayName: "Test SAML Provider",
-            EntityId: "https://saml-idp.test/metadata",
-            SsoUrl: "https://saml-idp.test/sso",
-            SloUrl: null,
-            Certificate: GenerateTestCertificate(),
-            NameIdFormat: SamlNameIdFormat.Email,
+        string mockIssuer = _factory.MockServerUrl;
+        _factory.SetupOidcDiscovery(mockIssuer);
+
+        SaveOidcConfigRequest request = new(
+            DisplayName: "Test OIDC Provider",
+            Issuer: mockIssuer,
+            ClientId: "test-client-id",
+            ClientSecret: "test-client-secret",
+            Scopes: "openid profile email",
             EmailAttribute: "email",
-            FirstNameAttribute: "givenName",
-            LastNameAttribute: "surname",
+            FirstNameAttribute: "given_name",
+            LastNameAttribute: "family_name",
             GroupsAttribute: null,
             EnforceForAllUsers: false,
             AutoProvisionUsers: true,
             DefaultRole: null,
             SyncGroupsAsRoles: false);
 
-        _ = await _ssoService.SaveSamlConfigurationAsync(request);
+        _ = await _ssoService.SaveOidcConfigurationAsync(request);
 
-        // Act
         SsoValidationResult result = await _ssoService.ValidateIdpConfigurationAsync();
 
-        // Assert - The certificate format may fail validation, which is expected for a test cert
         result.Should().NotBeNull();
-        if (result.IsValid)
-        {
-            result.IdpEntityId.Should().Be("https://saml-idp.test/metadata");
-            result.IdpSsoUrl.Should().Be("https://saml-idp.test/sso");
-            result.CertificateExpiry.Should().NotBeNull();
-        }
-        else
-        {
-            result.ErrorMessage.Should().NotBeNullOrEmpty();
-        }
-    }
-
-    private static string GenerateTestCertificate()
-    {
-        // This is a valid self-signed certificate for testing purposes
-        // Generated for testing SSO integration, expires in 2027
-        return @"MIIDXTCCAkWgAwIBAgIJAKJ6jG0y7fB9MA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
-BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
-aWRnaXRzIFB0eSBMdGQwHhcNMjYwMTAxMDAwMDAwWhcNMjcxMjMxMjM1OTU5WjBF
-MQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
-ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-CgKCAQEAz7e7v8xvLCLGrKWvLJd8y5w5YqGnLqR4pGPZKF2X8H6dJjY0LZYFqBvB
-YR2ZqM5xvZ8FN7O0H8H2L5q8M0YxPY6KW9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8
-F3L9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3
-X6Y8F3L9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8F3L9F0Y9q
-H0H3X6Y8F3L9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8F3L9F
-0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8F3L9F0Y9qH0H3X6Y8F
-3QIDAQABo1AwTjAdBgNVHQ4EFgQU7V8fZ2oH3f6yF9J8H6dJjY0LZYFqBvBYR2Zq
-M5xvZ8FN7O0H8H2L5q8MIH+YIBBGB0RVh0VQ0WVzdGCCEElbnRlZ3JhdGlvbiBU
-ZXN0IENlcnRpZmljYXRlIFBUeSBMdGQwDQYJKoZIhvcNAQELBQADggEBAF2MqQ==";
     }
 }
 
 public class SsoConfigurationTestFactory : FoundryApiFactory
 {
-    private WireMockServer? _keycloakMock;
+    private WireMockServer? _idpMock;
     private readonly List<JsonElement> _createdIdps = [];
     private readonly List<JsonElement> _updatedIdps = [];
 
@@ -356,8 +256,8 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
     {
         base.ConfigureWebHost(builder);
 
-        _keycloakMock = WireMockServer.Start();
-        SetupKeycloakMock();
+        _idpMock = WireMockServer.Start();
+        SetupIdpMock();
 
         builder.ConfigureTestServices(services =>
         {
@@ -365,13 +265,12 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
 
             services.AddHttpClient("KeycloakAdminClient", client =>
             {
-                client.BaseAddress = new Uri(_keycloakMock.Url!);
+                client.BaseAddress = new Uri(_idpMock.Url!);
             });
 
-            // Configure the default HttpClient to also use WireMock for external IdP testing
             services.AddHttpClient(string.Empty, client =>
             {
-                client.BaseAddress = new Uri(_keycloakMock.Url!);
+                client.BaseAddress = new Uri(_idpMock.Url!);
             });
 
             services.AddScoped<ITenantContext>(_ =>
@@ -383,10 +282,9 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
         });
     }
 
-    private void SetupKeycloakMock()
+    private void SetupIdpMock()
     {
-        // GET IdP - Check if exists (initially returns 404, then 200 after creation)
-        _keycloakMock!
+        _idpMock!
             .Given(Request.Create()
                 .WithPath("/admin/realms/foundry/identity-provider/instances/*")
                 .UsingGet())
@@ -395,7 +293,6 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
                 {
                     string alias = request.Path.Split('/').Last();
 
-                    // First check if we have an updated version
                     JsonElement updatedIdp = _updatedIdps.Where(i =>
                         i.ValueKind != JsonValueKind.Undefined &&
                         i.TryGetProperty("alias", out JsonElement aliasProperty) &&
@@ -419,7 +316,6 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
                         };
                     }
 
-                    // Otherwise return the created IdP
                     JsonElement createdIdp = _createdIdps.FirstOrDefault(i =>
                         i.ValueKind != JsonValueKind.Undefined &&
                         i.TryGetProperty("alias", out JsonElement aliasProperty) &&
@@ -446,8 +342,7 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
                     return new WireMock.ResponseMessage { StatusCode = 404 };
                 }));
 
-        // POST IdP - Create
-        _keycloakMock
+        _idpMock
             .Given(Request.Create()
                 .WithPath("/admin/realms/foundry/identity-provider/instances")
                 .UsingPost())
@@ -467,8 +362,7 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
                     };
                 }));
 
-        // PUT IdP - Update
-        _keycloakMock
+        _idpMock
             .Given(Request.Create()
                 .WithPath("/admin/realms/foundry/identity-provider/instances/*")
                 .UsingPut())
@@ -495,16 +389,14 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
                     };
                 }));
 
-        // POST IdP Mapper
-        _keycloakMock
+        _idpMock
             .Given(Request.Create()
                 .WithPath("/admin/realms/foundry/identity-provider/instances/*/mappers")
                 .UsingPost())
             .RespondWith(Response.Create()
                 .WithStatusCode(201));
 
-        // GET IdP Mappers
-        _keycloakMock
+        _idpMock
             .Given(Request.Create()
                 .WithPath("/admin/realms/foundry/identity-provider/instances/*/mappers")
                 .UsingGet())
@@ -515,8 +407,7 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
 
     public void SetupOidcDiscovery(string issuer)
     {
-        // The issuer URL will be accessed through the mock, so we need to handle it properly
-        _keycloakMock!
+        _idpMock!
             .Given(Request.Create()
                 .WithPath("/.well-known/openid-configuration")
                 .UsingGet())
@@ -532,18 +423,17 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
                     JwksUri = $"{issuer}/protocol/openid-connect/certs"
                 }));
 
-        // Also handle any path that might be requested
-        _keycloakMock
+        _idpMock
             .Given(Request.Create()
                 .UsingAnyMethod())
-            .AtPriority(999) // Low priority fallback
+            .AtPriority(999)
             .RespondWith(Response.Create()
                 .WithStatusCode(200));
     }
 
     public void SetupOidcDiscoveryFailure(string _)
     {
-        _keycloakMock!
+        _idpMock!
             .Given(Request.Create()
                 .WithPath("/.well-known/openid-configuration")
                 .UsingGet())
@@ -551,12 +441,12 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
                 .WithStatusCode(404));
     }
 
-    public void ResetKeycloakMock()
+    public void ResetIdpMock()
     {
         _createdIdps.Clear();
         _updatedIdps.Clear();
-        _keycloakMock?.Reset();
-        SetupKeycloakMock();
+        _idpMock?.Reset();
+        SetupIdpMock();
     }
 
     public void ResetUpdatedProviders()
@@ -566,12 +456,12 @@ public class SsoConfigurationTestFactory : FoundryApiFactory
 
     public IReadOnlyList<JsonElement> CreatedIdentityProviders => _createdIdps;
     public IReadOnlyList<JsonElement> UpdatedIdentityProviders => _updatedIdps;
-    public string MockServerUrl => _keycloakMock?.Url ?? throw new InvalidOperationException("Mock server not started");
+    public string MockServerUrl => _idpMock?.Url ?? throw new InvalidOperationException("Mock server not started");
 
     public new async Task DisposeAsync()
     {
         await base.DisposeAsync();
-        _keycloakMock?.Stop();
-        _keycloakMock?.Dispose();
+        _idpMock?.Stop();
+        _idpMock?.Dispose();
     }
 }

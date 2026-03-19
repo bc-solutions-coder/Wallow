@@ -1,11 +1,11 @@
 using Foundry.Identity.Application.Interfaces;
-using Foundry.Identity.Application.Settings;
+
 using Foundry.Identity.Domain.Entities;
 using Foundry.Identity.Infrastructure.Authorization;
 using Foundry.Identity.Infrastructure.Persistence;
 using Foundry.Identity.Infrastructure.Repositories;
 using Foundry.Identity.Infrastructure.Services;
-using Foundry.Shared.Infrastructure.Settings;
+
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -45,7 +45,7 @@ public static class IdentityInfrastructureExtensions
             {
                 options.SetAuthorizationEndpointUris("/connect/authorize")
                     .SetTokenEndpointUris("/connect/token")
-                    .SetLogoutEndpointUris("/connect/logout")
+                    .SetEndSessionEndpointUris("/connect/logout")
                     .SetUserInfoEndpointUris("/connect/userinfo");
 
                 options.AllowAuthorizationCodeFlow().RequireProofKeyForCodeExchange()
@@ -58,7 +58,7 @@ public static class IdentityInfrastructureExtensions
                 options.UseAspNetCore()
                     .EnableAuthorizationEndpointPassthrough()
                     .EnableTokenEndpointPassthrough()
-                    .EnableLogoutEndpointPassthrough()
+                    .EnableEndSessionEndpointPassthrough()
                     .EnableUserInfoEndpointPassthrough();
 
                 options.RegisterScopes("openid", "profile", "email", "roles");
@@ -72,7 +72,9 @@ public static class IdentityInfrastructureExtensions
         services.AddIdentityAuthorization();
         services.AddMultiTenancy();
         services.AddIdentityPersistence(configuration);
-        services.AddSettings<IdentityDbContext, IdentitySettingKeys>("identity");
+        // Settings registration skipped: IdentityDbContext inherits ASP.NET Identity's IdentityDbContext,
+        // not TenantAwareDbContext<T>, so the generic AddSettings<T> constraint cannot be satisfied.
+        // TODO: Implement a non-generic settings registration path for Identity module.
         services.AddIdentityServices();
 
         return services;

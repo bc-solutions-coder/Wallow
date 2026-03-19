@@ -5,6 +5,7 @@ using Foundry.Identity.Application.Interfaces;
 using Foundry.Identity.Domain.Entities;
 using Foundry.Identity.Domain.Identity;
 using Foundry.Shared.Kernel.Domain;
+using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Foundry.Shared.Kernel.Services;
 using Microsoft.Extensions.Logging;

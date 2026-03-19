@@ -75,10 +75,11 @@ public sealed class IdentityDbContext : AspNetIdentityDbContext
         {
             b.ToTable("users");
             b.Property(u => u.TenantId).HasColumnName("tenant_id");
-            b.Property(u => u.DisplayName).HasColumnName("display_name").HasMaxLength(256);
+            b.Property(u => u.FirstName).HasColumnName("first_name").HasMaxLength(256);
+            b.Property(u => u.LastName).HasColumnName("last_name").HasMaxLength(256);
             b.Property(u => u.IsActive).HasColumnName("is_active");
             b.Property(u => u.CreatedAt).HasColumnName("created_at");
-            b.Property(u => u.UpdatedAt).HasColumnName("updated_at");
+            b.Property(u => u.DeactivatedAt).HasColumnName("deactivated_at");
             b.Property(u => u.Id).HasColumnName("id");
             b.Property(u => u.UserName).HasColumnName("user_name");
             b.Property(u => u.NormalizedUserName).HasColumnName("normalized_user_name");

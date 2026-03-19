@@ -303,6 +303,20 @@ try
     await Foundry.Api.FoundryModules.InitializeFoundryModulesAsync(app);
     await app.InitializeAuditingAsync();
 
+    // Seed identity data (roles, admin user, dev OAuth2 client) in Development only
+    if (app.Environment.IsDevelopment())
+    {
+        await using AsyncServiceScope seedScope = app.Services.CreateAsyncScope();
+        IServiceProvider sp = seedScope.ServiceProvider;
+        Foundry.Identity.Infrastructure.Data.IdentityDataSeeder seeder = new(
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger<Foundry.Identity.Infrastructure.Data.IdentityDataSeeder>());
+        await seeder.SeedAsync(
+            sp.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Foundry.Identity.Domain.Entities.FoundryRole>>(),
+            sp.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Foundry.Identity.Domain.Entities.FoundryUser>>(),
+            sp.GetRequiredService<OpenIddict.Abstractions.IOpenIddictApplicationManager>(),
+            sp.GetRequiredService<TimeProvider>());
+    }
+
     // Middleware pipeline (order matters!)
 
     // Exception handling

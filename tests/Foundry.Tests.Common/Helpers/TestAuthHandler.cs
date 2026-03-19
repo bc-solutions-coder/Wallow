@@ -83,7 +83,7 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
         {
             new(ClaimTypes.NameIdentifier, userId),
             new(ClaimTypes.Email, $"{userId}@test.com"),
-            new("organization", tenantId),
+            new("org_id", tenantId),
         };
 
         foreach (string role in roles)

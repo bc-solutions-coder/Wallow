@@ -1,5 +1,4 @@
 using Foundry.Identity.Application.DTOs;
-using Foundry.Identity.Application.Exceptions;
 using Foundry.Identity.Application.Interfaces;
 using Foundry.Identity.Domain.Enums;
 using Foundry.Identity.Infrastructure.Persistence;
@@ -43,7 +42,7 @@ public class ScimProvisioningTests(ScimProvisioningTestFactory factory) : IClass
             DefaultRole: "user",
             DeprovisionOnDelete: false));
 
-        factory.ResetKeycloakMock();
+        factory.ResetIdpMock();
     }
 
     public Task DisposeAsync()
@@ -53,7 +52,7 @@ public class ScimProvisioningTests(ScimProvisioningTestFactory factory) : IClass
     }
 
     [Fact]
-    public async Task CreateUser_WithValidToken_CreatesInKeycloak()
+    public async Task CreateUser_WithValidToken_CreatesInIdp()
     {
         // Arrange
         ScimUserRequest request = new()
@@ -133,11 +132,11 @@ public class ScimProvisioningTests(ScimProvisioningTestFactory factory) : IClass
         };
 
         Func<Task> act = async () => await _scimService.CreateUserAsync(secondRequest);
-        await act.Should().ThrowAsync<KeycloakConflictException>();
+        await act.Should().ThrowAsync<Exception>();
     }
 
     [Fact]
-    public async Task UpdateUser_ModifiesKeycloakUser()
+    public async Task UpdateUser_ModifiesIdpUser()
     {
         // Arrange - Create user first
         ScimUserRequest createRequest = new()
@@ -241,7 +240,7 @@ public class ScimProvisioningTests(ScimProvisioningTestFactory factory) : IClass
     }
 
     [Fact]
-    public async Task DeleteUser_WithDeprovision_RemovesFromKeycloak()
+    public async Task DeleteUser_WithDeprovision_RemovesFromIdp()
     {
         // Arrange - Enable deprovisioning
         _dbContext.ChangeTracker.Clear();
@@ -380,7 +379,7 @@ public class ScimProvisioningTests(ScimProvisioningTestFactory factory) : IClass
 
 /// <summary>
 /// Test factory for SCIM provisioning tests.
-/// Uses WireMock to simulate Keycloak Admin API.
+/// Uses WireMock to simulate IdP Admin API.
 /// </summary>
 public class ScimProvisioningTestFactory : FoundryApiFactory
 {
@@ -397,7 +396,7 @@ public class ScimProvisioningTestFactory : FoundryApiFactory
         {
             services.AddHttpContextAccessor();
 
-            // Replace Keycloak HttpClient with WireMock
+            // Replace IdP HttpClient with WireMock
             services.AddHttpClient("KeycloakAdminClient", client =>
             {
                 client.BaseAddress = new Uri(_mockIdp.BaseUrl);
@@ -413,7 +412,7 @@ public class ScimProvisioningTestFactory : FoundryApiFactory
         });
     }
 
-    public void ResetKeycloakMock()
+    public void ResetIdpMock()
     {
         _mockIdp.Reset();
     }

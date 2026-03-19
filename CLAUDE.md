@@ -5,7 +5,7 @@ Foundry is a .NET 10 modular monolith with multi-tenancy, Clean Architecture, DD
 ## Commands
 
 ```bash
-# Start infrastructure (Postgres, RabbitMQ, Mailpit, Valkey, Keycloak)
+# Start infrastructure (Postgres, Mailpit, Valkey)
 cd docker && docker compose up -d
 
 # Run the API
@@ -58,8 +58,6 @@ Automated semver via [Conventional Commits](https://www.conventionalcommits.org/
 | Service | URL | Credentials |
 |---------|-----|-------------|
 | API | http://localhost:5000 | N/A |
-| Keycloak Admin | http://localhost:8080 | See `docker/.env` |
-| Keycloak Realm | foundry | admin@foundry.dev / Admin123! |
 | RabbitMQ | http://localhost:15672 | See `docker/.env` |
 | Mailpit | http://localhost:8025 | N/A |
 | Grafana | http://localhost:3000 | admin / admin |

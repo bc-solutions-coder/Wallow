@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Foundry.Identity.Infrastructure.MultiTenancy;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.AspNetCore.Http;
@@ -9,7 +8,6 @@ namespace Foundry.Identity.Tests.Infrastructure;
 
 public class TenantResolutionMiddlewareGapTests
 {
-    private static readonly string[] _readPermissions = ["read"];
     private readonly ILogger<TenantResolutionMiddleware> _logger = Substitute.For<ILogger<TenantResolutionMiddleware>>();
     private bool _nextCalled;
 
@@ -21,7 +19,7 @@ public class TenantResolutionMiddlewareGapTests
         Guid orgId = Guid.NewGuid();
 
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()),
+            new Claim("org_id", orgId.ToString()),
             new Claim(ClaimTypes.Role, "admin"));
         context.Request.Headers["X-Tenant-Id"] = "not-a-valid-guid";
 
@@ -48,25 +46,6 @@ public class TenantResolutionMiddlewareGapTests
     }
 
     [Fact]
-    public async Task InvokeAsync_RealmAccessWithNoRolesProperty_DoesNotOverrideTenant()
-    {
-        TenantContext tenantContext = new TenantContext();
-        TenantResolutionMiddleware middleware = CreateMiddleware();
-        Guid orgId = Guid.NewGuid();
-        Guid overrideId = Guid.NewGuid();
-
-        string realmAccess = JsonSerializer.Serialize(new { permissions = _readPermissions });
-        DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()),
-            new Claim("realm_access", realmAccess));
-        context.Request.Headers["X-Tenant-Id"] = overrideId.ToString();
-
-        await middleware.InvokeAsync(context, tenantContext);
-
-        tenantContext.TenantId.Value.Should().Be(orgId);
-    }
-
-    [Fact]
     public async Task InvokeAsync_TenantRegionClaimTakesPriorityOverHeader()
     {
         TenantContext tenantContext = new TenantContext();
@@ -74,7 +53,7 @@ public class TenantResolutionMiddlewareGapTests
         Guid orgId = Guid.NewGuid();
 
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()),
+            new Claim("org_id", orgId.ToString()),
             new Claim("tenant_region", "eu-central-1"));
         context.Request.Headers["X-Tenant-Region"] = "us-west-2";
 
@@ -107,7 +86,7 @@ public class TenantResolutionMiddlewareGapTests
         Guid overrideId = Guid.NewGuid();
 
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()));
+            new Claim("org_id", orgId.ToString()));
         context.Request.Headers["X-Tenant-Id"] = overrideId.ToString();
 
         await middleware.InvokeAsync(context, tenantContext);
@@ -116,16 +95,12 @@ public class TenantResolutionMiddlewareGapTests
     }
 
     [Fact]
-    public async Task InvokeAsync_JsonOrgClaimWithNoGuidProperty_DoesNotResolveTenant()
+    public async Task InvokeAsync_NonGuidOrgIdClaim_DoesNotResolveTenant()
     {
         TenantContext tenantContext = new TenantContext();
         TenantResolutionMiddleware middleware = CreateMiddleware();
 
-        string orgJson = JsonSerializer.Serialize(new Dictionary<string, object>
-        {
-            ["not-a-guid"] = new { name = "Test Org" }
-        });
-        DefaultHttpContext context = CreateAuthenticatedContext(new Claim("organization", orgJson));
+        DefaultHttpContext context = CreateAuthenticatedContext(new Claim("org_id", "not-a-guid-at-all"));
 
         await middleware.InvokeAsync(context, tenantContext);
 
@@ -133,25 +108,39 @@ public class TenantResolutionMiddlewareGapTests
     }
 
     [Fact]
-    public async Task InvokeAsync_AdminOverride_ClearsTenantName()
+    public async Task InvokeAsync_OperatorServiceAccount_WithTenantIdHeader_OverridesTenant()
     {
         TenantContext tenantContext = new TenantContext();
         TenantResolutionMiddleware middleware = CreateMiddleware();
         Guid orgId = Guid.NewGuid();
         Guid overrideId = Guid.NewGuid();
 
-        string orgJson = JsonSerializer.Serialize(new Dictionary<string, object>
-        {
-            [orgId.ToString()] = new { name = "Original Org" }
-        });
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgJson),
-            new Claim(ClaimTypes.Role, "admin"));
+            new Claim("org_id", orgId.ToString()),
+            new Claim("azp", "sa-operator-svc"));
         context.Request.Headers["X-Tenant-Id"] = overrideId.ToString();
 
         await middleware.InvokeAsync(context, tenantContext);
 
         tenantContext.TenantId.Value.Should().Be(overrideId);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_DeveloperApp_WithTenantIdHeader_DoesNotOverrideTenant()
+    {
+        TenantContext tenantContext = new TenantContext();
+        TenantResolutionMiddleware middleware = CreateMiddleware();
+        Guid orgId = Guid.NewGuid();
+        Guid overrideId = Guid.NewGuid();
+
+        DefaultHttpContext context = CreateAuthenticatedContext(
+            new Claim("org_id", orgId.ToString()),
+            new Claim("azp", "app-my-dev-app"));
+        context.Request.Headers["X-Tenant-Id"] = overrideId.ToString();
+
+        await middleware.InvokeAsync(context, tenantContext);
+
+        tenantContext.TenantId.Value.Should().Be(orgId);
     }
 
     private TenantResolutionMiddleware CreateMiddleware()

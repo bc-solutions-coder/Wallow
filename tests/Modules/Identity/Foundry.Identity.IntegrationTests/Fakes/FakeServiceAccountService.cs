@@ -9,7 +9,7 @@ namespace Foundry.Identity.IntegrationTests.Fakes;
 
 /// <summary>
 /// Fake implementation of IServiceAccountService for testing.
-/// Does not make real HTTP calls to Keycloak.
+/// Does not make real HTTP calls to an external IdP.
 /// </summary>
 public sealed class FakeServiceAccountService(IServiceAccountRepository repository, ITenantContext tenantContext) : IServiceAccountService
 {

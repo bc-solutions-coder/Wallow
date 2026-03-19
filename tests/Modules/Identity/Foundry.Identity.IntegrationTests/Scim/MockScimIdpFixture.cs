@@ -8,13 +8,13 @@ using WireMock.Server;
 namespace Foundry.Identity.IntegrationTests.Scim;
 
 /// <summary>
-/// Mock Keycloak Admin API server for SCIM integration testing.
-/// Uses WireMock.Net to simulate Keycloak Admin REST API endpoints.
+/// Mock IdP Admin API server for SCIM integration testing.
+/// Uses WireMock.Net to simulate IdP Admin REST API endpoints.
 /// </summary>
 public class MockScimIdpFixture : IAsyncLifetime
 {
     private WireMockServer? _server;
-    private readonly ConcurrentDictionary<string, KeycloakUser> _users = new();
+    private readonly ConcurrentDictionary<string, MockIdpUser> _users = new();
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -68,10 +68,10 @@ public class MockScimIdpFixture : IAsyncLifetime
                 .WithCallback(request =>
                 {
                     string? body = request.Body;
-                    KeycloakUser? user;
+                    MockIdpUser? user;
                     try
                     {
-                        user = body is not null ? JsonSerializer.Deserialize<KeycloakUser>(body, _jsonOptions) : null;
+                        user = body is not null ? JsonSerializer.Deserialize<MockIdpUser>(body, _jsonOptions) : null;
                     }
                     catch
                     {
@@ -83,7 +83,7 @@ public class MockScimIdpFixture : IAsyncLifetime
                         return new WireMock.ResponseMessage { StatusCode = 400 };
                     }
 
-                    // Detect duplicate username/email (Keycloak returns 409)
+                    // Detect duplicate username/email (IdP returns 409)
                     if (_users.Values.Any(u =>
                         (!string.IsNullOrEmpty(u.Username) && u.Username == user.Username) ||
                         (!string.IsNullOrEmpty(u.Email) && u.Email == user.Email)))
@@ -125,7 +125,7 @@ public class MockScimIdpFixture : IAsyncLifetime
                         return new WireMock.ResponseMessage { StatusCode = 404 };
                     }
 
-                    if (_users.TryGetValue(userId, out KeycloakUser? user))
+                    if (_users.TryGetValue(userId, out MockIdpUser? user))
                     {
                         string json = JsonSerializer.Serialize(user, _jsonOptions);
                         return new WireMock.ResponseMessage
@@ -160,15 +160,15 @@ public class MockScimIdpFixture : IAsyncLifetime
                 {
                     string userId = request.Path.Split('/').Last();
 
-                    if (!_users.TryGetValue(userId, out KeycloakUser? existingUser))
+                    if (!_users.TryGetValue(userId, out MockIdpUser? existingUser))
                     {
                         return new WireMock.ResponseMessage { StatusCode = 404 };
                     }
 
-                    KeycloakUser? updatedUser;
+                    MockIdpUser? updatedUser;
                     try
                     {
-                        updatedUser = request.Body is not null ? JsonSerializer.Deserialize<KeycloakUser>(request.Body, _jsonOptions) : null;
+                        updatedUser = request.Body is not null ? JsonSerializer.Deserialize<MockIdpUser>(request.Body, _jsonOptions) : null;
                     }
                     catch
                     {
@@ -228,7 +228,7 @@ public class MockScimIdpFixture : IAsyncLifetime
             .RespondWith(Response.Create()
                 .WithCallback(request =>
                 {
-                    List<KeycloakUser> users = _users.Values.ToList();
+                    List<MockIdpUser> users = _users.Values.ToList();
 
                     // Apply query filters
                     IDictionary<string, WireMock.Types.WireMockList<string>>? queryParams = request.Query;
@@ -342,7 +342,7 @@ public class MockScimIdpFixture : IAsyncLifetime
 
 }
 
-public class KeycloakUser
+public class MockIdpUser
 {
     [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;

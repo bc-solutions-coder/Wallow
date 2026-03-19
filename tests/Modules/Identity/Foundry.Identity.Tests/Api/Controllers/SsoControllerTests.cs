@@ -1,4 +1,3 @@
-using Foundry.Identity.Api.Contracts.Enums;
 using Foundry.Identity.Api.Contracts.Requests;
 using Foundry.Identity.Api.Controllers;
 using Foundry.Identity.Application.DTOs;
@@ -44,57 +43,6 @@ public class SsoControllerTests
         ActionResult<SsoConfigurationDto> result = await _controller.GetConfiguration(CancellationToken.None);
 
         result.Result.Should().BeOfType<NotFoundResult>();
-    }
-
-    #endregion
-
-    #region ConfigureSaml
-
-    [Fact]
-    public async Task ConfigureSaml_WithValidRequest_ReturnsOkWithConfig()
-    {
-        ConfigureSamlSsoRequest request = new(
-            "My IdP", "entity-id", "https://idp/sso", "https://idp/slo",
-            "cert-data", ApiSamlNameIdFormat.Email);
-        SsoConfigurationDto config = CreateSsoConfig();
-        _ssoService.SaveSamlConfigurationAsync(Arg.Any<SaveSamlConfigRequest>(), Arg.Any<CancellationToken>())
-            .Returns(config);
-
-        ActionResult<SsoConfigurationDto> result = await _controller.ConfigureSaml(request, CancellationToken.None);
-
-        OkObjectResult ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
-        ok.Value.Should().BeOfType<SsoConfigurationDto>();
-    }
-
-    [Fact]
-    public async Task ConfigureSaml_MapsApiRequestToApplicationRequest()
-    {
-        ConfigureSamlSsoRequest request = new(
-            "My IdP", "entity-id", "https://idp/sso", "https://idp/slo",
-            "cert-data", ApiSamlNameIdFormat.Persistent,
-            "mail", "first", "last", "groups", true, false, "admin", true);
-        SsoConfigurationDto config = CreateSsoConfig();
-        SaveSamlConfigRequest? capturedRequest = null;
-        _ssoService.SaveSamlConfigurationAsync(Arg.Do<SaveSamlConfigRequest>(r => capturedRequest = r), Arg.Any<CancellationToken>())
-            .Returns(config);
-
-        await _controller.ConfigureSaml(request, CancellationToken.None);
-
-        capturedRequest.Should().NotBeNull();
-        capturedRequest!.DisplayName.Should().Be("My IdP");
-        capturedRequest.EntityId.Should().Be("entity-id");
-        capturedRequest.SsoUrl.Should().Be("https://idp/sso");
-        capturedRequest.SloUrl.Should().Be("https://idp/slo");
-        capturedRequest.Certificate.Should().Be("cert-data");
-        capturedRequest.NameIdFormat.Should().Be(SamlNameIdFormat.Persistent);
-        capturedRequest.EmailAttribute.Should().Be("mail");
-        capturedRequest.FirstNameAttribute.Should().Be("first");
-        capturedRequest.LastNameAttribute.Should().Be("last");
-        capturedRequest.GroupsAttribute.Should().Be("groups");
-        capturedRequest.EnforceForAllUsers.Should().BeTrue();
-        capturedRequest.AutoProvisionUsers.Should().BeFalse();
-        capturedRequest.DefaultRole.Should().Be("admin");
-        capturedRequest.SyncGroupsAsRoles.Should().BeTrue();
     }
 
     #endregion
@@ -185,24 +133,6 @@ public class SsoControllerTests
 
         result.Should().BeOfType<NoContentResult>();
         await _ssoService.Received(1).DisableAsync(Arg.Any<CancellationToken>());
-    }
-
-    #endregion
-
-    #region GetSamlMetadata
-
-    [Fact]
-    public async Task GetSamlMetadata_ReturnsXmlContent()
-    {
-        string xmlMetadata = "<EntityDescriptor>...</EntityDescriptor>";
-        _ssoService.GetSamlServiceProviderMetadataAsync(Arg.Any<CancellationToken>())
-            .Returns(xmlMetadata);
-
-        IActionResult result = await _controller.GetSamlMetadata(CancellationToken.None);
-
-        ContentResult content = result.Should().BeOfType<ContentResult>().Subject;
-        content.Content.Should().Be(xmlMetadata);
-        content.ContentType.Should().Be("application/xml");
     }
 
     #endregion

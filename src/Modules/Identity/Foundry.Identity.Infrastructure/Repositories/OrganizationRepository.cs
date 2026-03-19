@@ -16,7 +16,7 @@ public sealed class OrganizationRepository(IdentityDbContext context) : IOrganiz
             .FirstOrDefaultAsync(o => o.Id == id, ct);
     }
 
-    public async Task<List<Organization>> GetAllAsync(string? search = null, int skip = 0, int take = 20, CancellationToken ct = default)
+    public Task<List<Organization>> GetAllAsync(string? search = null, int skip = 0, int take = 20, CancellationToken ct = default)
     {
         IQueryable<Organization> query = context.Organizations
             .Include(o => o.Members);
@@ -26,16 +26,16 @@ public sealed class OrganizationRepository(IdentityDbContext context) : IOrganiz
             query = query.Where(o => o.Name.Contains(search));
         }
 
-        return await query
+        return query
             .OrderBy(o => o.Name)
             .Skip(skip)
             .Take(take)
             .ToListAsync(ct);
     }
 
-    public async Task<List<Organization>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    public Task<List<Organization>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
-        return await context.Organizations
+        return context.Organizations
             .Include(o => o.Members)
             .Where(o => o.Members.Any(m => m.UserId == userId))
             .OrderBy(o => o.Name)

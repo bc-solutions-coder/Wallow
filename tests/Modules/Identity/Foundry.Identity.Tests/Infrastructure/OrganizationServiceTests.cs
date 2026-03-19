@@ -5,10 +5,10 @@ using Foundry.Identity.Domain.Identity;
 using Foundry.Identity.Infrastructure.Persistence;
 using Foundry.Identity.Infrastructure.Services;
 using Foundry.Shared.Contracts.Identity.Events;
+using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Wolverine;
 
@@ -86,7 +86,6 @@ public sealed class OrganizationServiceTests : IDisposable
     public async Task GetOrganizationByIdAsync_WhenExists_ReturnsDto()
     {
         Guid orgId = Guid.NewGuid();
-        OrganizationId id = OrganizationId.Create(orgId);
         Organization organization = Organization.Create(
             new TenantId(_tenantId), "Test Org", "test-org", Guid.NewGuid(), TimeProvider.System);
 

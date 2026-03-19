@@ -15,8 +15,11 @@ namespace Foundry.Identity.Api.Controllers;
 [Route("~/connect/token")]
 public sealed class TokenController(UserManager<FoundryUser> userManager) : Controller
 {
-    [HttpPost, Produces("application/json")]
+    // OAuth token endpoint — antiforgery tokens are not applicable for machine-to-machine OAuth flows
+#pragma warning disable CA5391
+    [HttpPost, Produces("application/json"), IgnoreAntiforgeryToken]
     public async Task<IActionResult> Exchange()
+#pragma warning restore CA5391
     {
         OpenIddictRequest request = HttpContext.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
@@ -80,7 +83,11 @@ public sealed class TokenController(UserManager<FoundryUser> userManager) : Cont
         }
 
         identity.SetScopes(principal.GetScopes());
-        identity.SetDestinations(GetDestinations);
+
+        foreach (Claim claim in identity.Claims)
+        {
+            claim.SetDestinations(GetDestinations(claim));
+        }
 
         return SignIn(new ClaimsPrincipal(identity),
             OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -113,7 +120,11 @@ public sealed class TokenController(UserManager<FoundryUser> userManager) : Cont
         }
 
         identity.SetScopes(principal.GetScopes());
-        identity.SetDestinations(GetDestinations);
+
+        foreach (Claim claim in identity.Claims)
+        {
+            claim.SetDestinations(GetDestinations(claim));
+        }
 
         return SignIn(new ClaimsPrincipal(identity),
             OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);

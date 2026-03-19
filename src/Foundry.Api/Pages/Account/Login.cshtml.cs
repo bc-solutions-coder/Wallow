@@ -55,7 +55,9 @@ public class LoginModel : PageModel
         return Page();
     }
 
+#pragma warning disable CA1034 // Razor Page binding model needs to be accessible
     public class LoginInput
+#pragma warning restore CA1034
     {
         [Required]
         [EmailAddress]

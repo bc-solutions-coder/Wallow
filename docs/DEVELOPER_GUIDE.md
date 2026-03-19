@@ -14,13 +14,13 @@
 
 ### 1. Start Infrastructure
 
-Foundry depends on PostgreSQL, RabbitMQ, Mailpit, Valkey (Redis-compatible cache), and Keycloak. Docker Compose provisions all of them:
+Foundry depends on PostgreSQL, RabbitMQ, Mailpit, and Valkey (Redis-compatible cache). Docker Compose provisions all of them:
 
 ```bash
 cd docker && docker compose up -d
 ```
 
-Keycloak takes 1-2 minutes on first boot. The `foundry` realm is auto-provisioned with clients, roles, and a test user.
+Authentication is handled by the embedded OpenIddict server (part of the Identity module), so no external identity provider container is needed.
 
 ### 2. Run the API
 
@@ -55,8 +55,8 @@ Integration tests require Docker. Testcontainers spins up ephemeral Postgres, Ra
 |---------|-----|-------------|
 | API | http://localhost:5000 | - |
 | Scalar Docs | http://localhost:5000/scalar/v1 | - |
-| Keycloak Admin | http://localhost:8080 | See `docker/.env` |
-| Keycloak Account | http://localhost:8080/realms/foundry/account | admin@foundry.dev / Admin123! |
+| OpenIddict Authorize | http://localhost:5000/connect/authorize | - |
+| OpenIddict Token | http://localhost:5000/connect/token | - |
 | RabbitMQ | http://localhost:15672 | See `docker/.env` |
 | Mailpit | http://localhost:8025 | - |
 | PostgreSQL | localhost:5432 | See `docker/.env` |
@@ -65,14 +65,18 @@ Integration tests require Docker. Testcontainers spins up ephemeral Postgres, Ra
 
 ### Getting a Test Token
 
+Use the OpenIddict token endpoint with client credentials or authorization code flow:
+
 ```bash
-curl -s -X POST http://localhost:8080/realms/foundry/protocol/openid-connect/token \
-  -d "grant_type=password" \
-  -d "client_id=foundry-api" \
-  -d "client_secret=foundry-api-secret" \
-  -d "username=admin@foundry.dev" \
-  -d "password=Admin123!"
+# Client credentials (service account)
+curl -s -X POST http://localhost:5000/connect/token \
+  -d "grant_type=client_credentials" \
+  -d "client_id=<your-client-id>" \
+  -d "client_secret=<your-client-secret>" \
+  -d "scope=openid profile email"
 ```
+
+In development, the `ApiScopeSeeder` seeds default API scopes at startup. Use the `ClientsController` admin API (`/api/v1/identity/clients`) to register new OpenIddict applications and obtain client credentials.
 
 ### Resetting Infrastructure
 
@@ -559,7 +563,7 @@ Tenant isolation is enforced at three layers.
 
 ### 1. Middleware
 
-`TenantResolutionMiddleware` reads the organization claim from the Keycloak JWT and populates `ITenantContext` for the request scope.
+`TenantResolutionMiddleware` reads the `org_id` claim (flat GUID string) from the JWT and populates `ITenantContext` for the request scope.
 
 ### 2. Entity Marking
 
@@ -677,7 +681,7 @@ Foundry uses **xUnit** as the test framework, **FluentAssertions** for readable 
 
 Shared test utilities live in `tests/Foundry.Tests.Common/`, including:
 - `FoundryApiFactory` -- `WebApplicationFactory` configured with Testcontainers
-- `DatabaseFixture`, `RabbitMqFixture`, `RedisFixture`, `KeycloakFixture` -- reusable xUnit fixtures
+- `DatabaseFixture`, `RabbitMqFixture`, `RedisFixture` -- reusable xUnit fixtures
 - `Builders/`, `Fakes/`, `Helpers/` -- test data builders and utilities
 
 ### Unit Tests
@@ -741,15 +745,13 @@ public class InvoicesControllerTests : IClassFixture<FoundryApiFactory>
 | Logging | Serilog |
 | Real-time | SignalR |
 | Validation | FluentValidation |
-| Identity Provider | Keycloak 26 |
+| Identity / Auth | ASP.NET Core Identity + OpenIddict |
 | Caching | Valkey (Redis-compatible) |
 | Testing | xUnit, Testcontainers, FluentAssertions |
 
 ---
 
 ## Troubleshooting
-
-**Keycloak not responding**: Wait 1-2 minutes after first `docker compose up`. Check `docker compose logs keycloak`.
 
 **DB connection failures**: Verify Postgres is running with `docker compose ps`. Check connection strings in `appsettings.Development.json`.
 

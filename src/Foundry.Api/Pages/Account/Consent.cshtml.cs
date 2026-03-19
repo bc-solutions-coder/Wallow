@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Claims;
 using Foundry.Identity.Domain.Entities;
 using Microsoft.AspNetCore;
@@ -17,28 +18,8 @@ public class ConsentModel : PageModel
     private readonly UserManager<FoundryUser> _userManager;
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly IOpenIddictAuthorizationManager _authorizationManager;
-    private readonly IOpenIddictScopeManager _scopeManager;
 
-    public ConsentModel(
-        UserManager<FoundryUser> userManager,
-        IOpenIddictApplicationManager applicationManager,
-        IOpenIddictAuthorizationManager authorizationManager,
-        IOpenIddictScopeManager scopeManager)
-    {
-        _userManager = userManager;
-        _applicationManager = applicationManager;
-        _authorizationManager = authorizationManager;
-        _scopeManager = scopeManager;
-    }
-
-    public string ApplicationName { get; set; } = string.Empty;
-
-    public List<ScopeViewModel> RequestedScopes { get; set; } = [];
-
-    [TempData]
-    public string? ErrorMessage { get; set; }
-
-    private static readonly Dictionary<string, (string DisplayName, string Description)> ScopeDescriptions = new()
+    private static readonly Dictionary<string, (string DisplayName, string Description)> _scopeDescriptions = new()
     {
         [Scopes.OpenId] = ("Verify your identity", "Confirm who you are"),
         [Scopes.Profile] = ("Access your profile", "Read your name and profile information"),
@@ -46,6 +27,23 @@ public class ConsentModel : PageModel
         [Scopes.Roles] = ("Access your roles", "Read your assigned roles"),
         [Scopes.OfflineAccess] = ("Stay signed in", "Maintain access when you are not actively using the application"),
     };
+
+    public ConsentModel(
+        UserManager<FoundryUser> userManager,
+        IOpenIddictApplicationManager applicationManager,
+        IOpenIddictAuthorizationManager authorizationManager)
+    {
+        _userManager = userManager;
+        _applicationManager = applicationManager;
+        _authorizationManager = authorizationManager;
+    }
+
+    public string ApplicationName { get; set; } = string.Empty;
+
+    public IReadOnlyList<ScopeViewModel> RequestedScopes { get; set; } = [];
+
+    [TempData]
+    public string? ErrorMessage { get; set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -64,19 +62,21 @@ public class ConsentModel : PageModel
         ApplicationName = await _applicationManager.GetDisplayNameAsync(application) ?? request.ClientId!;
 
         ImmutableArray<string> scopes = request.GetScopes();
-        RequestedScopes = [];
+        List<ScopeViewModel> scopeViewModels = [];
 
         foreach (string scope in scopes)
         {
-            if (ScopeDescriptions.TryGetValue(scope, out (string DisplayName, string Description) info))
+            if (_scopeDescriptions.TryGetValue(scope, out (string DisplayName, string Description) info))
             {
-                RequestedScopes.Add(new ScopeViewModel { Name = scope, DisplayName = info.DisplayName, Description = info.Description });
+                scopeViewModels.Add(new ScopeViewModel { Name = scope, DisplayName = info.DisplayName, Description = info.Description });
             }
             else
             {
-                RequestedScopes.Add(new ScopeViewModel { Name = scope, DisplayName = scope, Description = scope });
+                scopeViewModels.Add(new ScopeViewModel { Name = scope, DisplayName = scope, Description = scope });
             }
         }
+
+        RequestedScopes = scopeViewModels;
 
         return Page();
     }
@@ -101,7 +101,7 @@ public class ConsentModel : PageModel
             return BadRequest("The specified client application could not be found.");
         }
 
-        string? applicationId = await _applicationManager.GetIdAsync(application);
+        string applicationId = await _applicationManager.GetIdAsync(application) ?? string.Empty;
         string userId = user.Id.ToString();
         ImmutableArray<string> scopes = request.GetScopes();
 
@@ -110,7 +110,7 @@ public class ConsentModel : PageModel
 
         await foreach (object? existing in _authorizationManager.FindAsync(
             subject: userId,
-            client: applicationId!,
+            client: applicationId,
             status: Statuses.Valid,
             type: AuthorizationTypes.Permanent,
             scopes: scopes))
@@ -122,7 +122,7 @@ public class ConsentModel : PageModel
         authorization ??= await _authorizationManager.CreateAsync(
             identity: new ClaimsIdentity(),
             subject: userId,
-            client: applicationId!,
+            client: applicationId,
             type: AuthorizationTypes.Permanent,
             scopes: scopes);
 
@@ -134,11 +134,15 @@ public class ConsentModel : PageModel
             roleType: Claims.Role);
 
         identity.SetClaim(Claims.Subject, userId);
-        identity.SetClaim(Claims.Name, user.DisplayName);
+        identity.SetClaim(Claims.Name, $"{user.FirstName} {user.LastName}");
         identity.SetClaim(Claims.Email, user.Email);
 
         identity.SetScopes(scopes);
-        identity.SetDestinations(GetDestinations);
+
+        foreach (Claim claim in identity.Claims)
+        {
+            claim.SetDestinations(GetDestinations(claim));
+        }
 
         identity.SetClaim("oi_au_id", authorizationId);
 
@@ -152,34 +156,27 @@ public class ConsentModel : PageModel
         return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    private static IEnumerable<string> GetDestinations(Claim claim)
+    private static ImmutableArray<string> GetDestinations(Claim claim)
     {
-        switch (claim.Type)
+        return claim.Type switch
         {
-            case Claims.Name or Claims.Email:
-                yield return Destinations.AccessToken;
-                if (claim.Subject?.HasScope(Scopes.Profile) is true ||
-                    (claim.Type == Claims.Email && claim.Subject?.HasScope(Scopes.Email) is true))
-                {
-                    yield return Destinations.IdentityToken;
-                }
-                break;
+            Claims.Name or Claims.Email
+                when claim.Subject?.HasScope(Scopes.Profile) is true ||
+                     (claim.Type == Claims.Email && claim.Subject?.HasScope(Scopes.Email) is true)
+                => [Destinations.AccessToken, Destinations.IdentityToken],
 
-            case Claims.Subject:
-                yield return Destinations.AccessToken;
-                yield return Destinations.IdentityToken;
-                break;
+            Claims.Subject => [Destinations.AccessToken, Destinations.IdentityToken],
 
-            default:
-                yield return Destinations.AccessToken;
-                break;
-        }
+            _ => [Destinations.AccessToken]
+        };
     }
 
+#pragma warning disable CA1034 // Razor Page view model needs to be accessible
     public class ScopeViewModel
     {
         public string Name { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
     }
+#pragma warning restore CA1034
 }

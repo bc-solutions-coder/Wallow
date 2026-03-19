@@ -1,5 +1,7 @@
+using System.Collections.Immutable;
 using System.Security.Claims;
 using Foundry.Identity.Domain.Entities;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Abstractions;
@@ -36,72 +38,75 @@ public class AuthorizationController(UserManager<FoundryUser> userManager) : Con
 
         string? userName = await userManager.GetUserNameAsync(user);
         if (userName is not null)
+        {
             identity.AddClaim(Claims.Name, userName);
+        }
 
         string? email = await userManager.GetEmailAsync(user);
         if (email is not null)
+        {
             identity.AddClaim(Claims.Email, email);
+        }
 
         IList<string> roles = await userManager.GetRolesAsync(user);
         foreach (string role in roles)
+        {
             identity.AddClaim(Claims.Role, role);
+        }
 
         IList<Claim> existingClaims = await userManager.GetClaimsAsync(user);
 
         Claim? givenName = existingClaims.FirstOrDefault(c => c.Type == Claims.GivenName);
         if (givenName is not null)
+        {
             identity.AddClaim(givenName);
+        }
 
         Claim? familyName = existingClaims.FirstOrDefault(c => c.Type == Claims.FamilyName);
         if (familyName is not null)
+        {
             identity.AddClaim(familyName);
+        }
 
         identity.SetScopes(request.GetScopes());
-        identity.SetDestinations(GetDestinations);
+
+        foreach (Claim claim in identity.Claims)
+        {
+            claim.SetDestinations(GetDestinations(claim));
+        }
 
         return SignIn(new ClaimsPrincipal(identity), OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    [HttpPost]
+    // OAuth authorization endpoint — antiforgery tokens are not applicable for OAuth flows
+#pragma warning disable CA5391
+    [HttpPost, IgnoreAntiforgeryToken]
     public Task<IActionResult> AuthorizePost() => Authorize();
+#pragma warning restore CA5391
 
-    private static IEnumerable<string> GetDestinations(Claim claim)
+    private static ImmutableArray<string> GetDestinations(Claim claim)
     {
-        switch (claim.Type)
+        return claim.Type switch
         {
-            case Claims.Subject:
-                yield return Destinations.AccessToken;
-                yield return Destinations.IdentityToken;
-                yield break;
+            Claims.Subject => [Destinations.AccessToken, Destinations.IdentityToken],
 
-            case Claims.Name:
-                yield return Destinations.AccessToken;
-                if (claim.Subject?.HasScope(Scopes.Profile) is true)
-                    yield return Destinations.IdentityToken;
-                yield break;
+            Claims.Name
+                when claim.Subject?.HasScope(Scopes.Profile) is true
+                => [Destinations.AccessToken, Destinations.IdentityToken],
 
-            case Claims.Email:
-                yield return Destinations.AccessToken;
-                if (claim.Subject?.HasScope(Scopes.Email) is true)
-                    yield return Destinations.IdentityToken;
-                yield break;
+            Claims.Email
+                when claim.Subject?.HasScope(Scopes.Email) is true
+                => [Destinations.AccessToken, Destinations.IdentityToken],
 
-            case Claims.GivenName:
-            case Claims.FamilyName:
-                yield return Destinations.AccessToken;
-                if (claim.Subject?.HasScope(Scopes.Profile) is true)
-                    yield return Destinations.IdentityToken;
-                yield break;
+            Claims.GivenName or Claims.FamilyName
+                when claim.Subject?.HasScope(Scopes.Profile) is true
+                => [Destinations.AccessToken, Destinations.IdentityToken],
 
-            case Claims.Role:
-                yield return Destinations.AccessToken;
-                if (claim.Subject?.HasScope(Scopes.Roles) is true)
-                    yield return Destinations.IdentityToken;
-                yield break;
+            Claims.Role
+                when claim.Subject?.HasScope(Scopes.Roles) is true
+                => [Destinations.AccessToken, Destinations.IdentityToken],
 
-            default:
-                yield return Destinations.AccessToken;
-                yield break;
-        }
+            _ => [Destinations.AccessToken]
+        };
     }
 }

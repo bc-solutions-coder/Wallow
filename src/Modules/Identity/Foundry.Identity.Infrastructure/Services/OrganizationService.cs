@@ -196,7 +196,7 @@ public sealed partial class OrganizationService(
     {
         return name.ToLowerInvariant()
             .Replace(' ', '-')
-            .Replace("--", "-")
+            .Replace("--", "-", StringComparison.Ordinal)
             .Trim('-');
     }
 }

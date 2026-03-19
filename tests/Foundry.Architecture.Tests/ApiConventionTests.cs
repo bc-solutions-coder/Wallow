@@ -27,11 +27,20 @@ public class ApiConventionTests
             .Inherit(typeof(ControllerBase))
             .GetTypes();
 
+        // OpenIddict OIDC controllers use standard OAuth2/OIDC patterns, not REST API conventions
+        string[] oidcControllers = ["AuthorizationController", "TokenController", "LogoutController"];
+
         foreach (Type controller in controllers)
         {
             // Controllers should have "Controller" suffix
             controller.Name.Should().EndWith("Controller",
                 $"Controller {controller.Name} in {moduleName} module should have 'Controller' suffix");
+
+            // Skip OIDC controllers for API-specific conventions
+            if (oidcControllers.Contains(controller.Name, StringComparer.Ordinal))
+            {
+                continue;
+            }
 
             // Controllers should have [ApiController] attribute
             controller.GetCustomAttribute<ApiControllerAttribute>().Should().NotBeNull(

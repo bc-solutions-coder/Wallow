@@ -108,11 +108,10 @@ public sealed partial class UserManagementService(
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            string searchLower = search.ToLowerInvariant();
             query = query.Where(u =>
-                (u.Email != null && u.Email.ToLower().Contains(searchLower)) ||
-                u.FirstName.ToLower().Contains(searchLower) ||
-                u.LastName.ToLower().Contains(searchLower));
+                (u.Email != null && u.Email.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                u.FirstName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                u.LastName.Contains(search, StringComparison.OrdinalIgnoreCase));
         }
 
         List<FoundryUser> users = await query

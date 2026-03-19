@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Foundry.Identity.Infrastructure.MultiTenancy;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Microsoft.AspNetCore.Http;
@@ -9,7 +8,6 @@ namespace Foundry.Identity.Tests.Infrastructure;
 
 public class TenantResolutionMiddlewareTests
 {
-    private static readonly string[] _adminUserRoles = ["admin", "user"];
     private readonly ILogger<TenantResolutionMiddleware> _logger = Substitute.For<ILogger<TenantResolutionMiddleware>>();
     private bool _nextCalled;
 
@@ -27,38 +25,18 @@ public class TenantResolutionMiddlewareTests
     }
 
     [Fact]
-    public async Task InvokeAsync_AuthenticatedUser_WithGuidOrganizationClaim_ResolvesTenant()
+    public async Task InvokeAsync_AuthenticatedUser_WithGuidOrgIdClaim_ResolvesTenant()
     {
         TenantContext tenantContext = new TenantContext();
         TenantResolutionMiddleware middleware = CreateMiddleware();
         Guid orgId = Guid.NewGuid();
-        DefaultHttpContext context = CreateAuthenticatedContext(new Claim("organization", orgId.ToString()));
+        DefaultHttpContext context = CreateAuthenticatedContext(new Claim("org_id", orgId.ToString()));
 
         await middleware.InvokeAsync(context, tenantContext);
 
         _nextCalled.Should().BeTrue();
         tenantContext.IsResolved.Should().BeTrue();
         tenantContext.TenantId.Value.Should().Be(orgId);
-    }
-
-    [Fact]
-    public async Task InvokeAsync_AuthenticatedUser_WithKeycloak26JsonFormat_ResolvesTenant()
-    {
-        TenantContext tenantContext = new TenantContext();
-        TenantResolutionMiddleware middleware = CreateMiddleware();
-        Guid orgId = Guid.NewGuid();
-        string orgJson = JsonSerializer.Serialize(new Dictionary<string, object>
-        {
-            [orgId.ToString()] = new { name = "Test Org" }
-        });
-        DefaultHttpContext context = CreateAuthenticatedContext(new Claim("organization", orgJson));
-
-        await middleware.InvokeAsync(context, tenantContext);
-
-        _nextCalled.Should().BeTrue();
-        tenantContext.IsResolved.Should().BeTrue();
-        tenantContext.TenantId.Value.Should().Be(orgId);
-        tenantContext.TenantName.Should().Be("Test Org");
     }
 
     [Fact]
@@ -66,7 +44,7 @@ public class TenantResolutionMiddlewareTests
     {
         TenantContext tenantContext = new TenantContext();
         TenantResolutionMiddleware middleware = CreateMiddleware();
-        DefaultHttpContext context = CreateAuthenticatedContext(new Claim("organization", "not-a-guid"));
+        DefaultHttpContext context = CreateAuthenticatedContext(new Claim("org_id", "not-a-guid"));
 
         await middleware.InvokeAsync(context, tenantContext);
 
@@ -83,7 +61,7 @@ public class TenantResolutionMiddlewareTests
         Guid overrideId = Guid.NewGuid();
 
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()),
+            new Claim("org_id", orgId.ToString()),
             new Claim(ClaimTypes.Role, "admin"));
         context.Request.Headers["X-Tenant-Id"] = overrideId.ToString();
 
@@ -102,7 +80,7 @@ public class TenantResolutionMiddlewareTests
         Guid overrideId = Guid.NewGuid();
 
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()),
+            new Claim("org_id", orgId.ToString()),
             new Claim(ClaimTypes.Role, "user"));
         context.Request.Headers["X-Tenant-Id"] = overrideId.ToString();
 
@@ -113,26 +91,6 @@ public class TenantResolutionMiddlewareTests
     }
 
     [Fact]
-    public async Task InvokeAsync_AdminUser_WithRealmAccessClaim_OverridesTenant()
-    {
-        TenantContext tenantContext = new TenantContext();
-        TenantResolutionMiddleware middleware = CreateMiddleware();
-        Guid orgId = Guid.NewGuid();
-        Guid overrideId = Guid.NewGuid();
-        string realmAccess = JsonSerializer.Serialize(new { roles = _adminUserRoles });
-
-        DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()),
-            new Claim("realm_access", realmAccess));
-        context.Request.Headers["X-Tenant-Id"] = overrideId.ToString();
-
-        await middleware.InvokeAsync(context, tenantContext);
-
-        tenantContext.IsResolved.Should().BeTrue();
-        tenantContext.TenantId.Value.Should().Be(overrideId);
-    }
-
-    [Fact]
     public async Task InvokeAsync_WithTenantRegionClaim_SetsRegion()
     {
         TenantContext tenantContext = new TenantContext();
@@ -140,7 +98,7 @@ public class TenantResolutionMiddlewareTests
         Guid orgId = Guid.NewGuid();
 
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()),
+            new Claim("org_id", orgId.ToString()),
             new Claim("tenant_region", "eu-west-1"));
 
         await middleware.InvokeAsync(context, tenantContext);
@@ -156,7 +114,7 @@ public class TenantResolutionMiddlewareTests
         Guid orgId = Guid.NewGuid();
 
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()));
+            new Claim("org_id", orgId.ToString()));
         context.Request.Headers["X-Tenant-Region"] = "us-east-1";
 
         await middleware.InvokeAsync(context, tenantContext);
@@ -172,7 +130,7 @@ public class TenantResolutionMiddlewareTests
         Guid orgId = Guid.NewGuid();
 
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()));
+            new Claim("org_id", orgId.ToString()));
 
         await middleware.InvokeAsync(context, tenantContext);
 
@@ -184,7 +142,7 @@ public class TenantResolutionMiddlewareTests
     {
         TenantContext tenantContext = new TenantContext();
         TenantResolutionMiddleware middleware = CreateMiddleware();
-        DefaultHttpContext context = CreateAuthenticatedContext(new Claim("organization", ""));
+        DefaultHttpContext context = CreateAuthenticatedContext(new Claim("org_id", ""));
 
         await middleware.InvokeAsync(context, tenantContext);
 
@@ -192,7 +150,7 @@ public class TenantResolutionMiddlewareTests
     }
 
     [Fact]
-    public async Task InvokeAsync_WithInvalidRealmAccessJson_DoesNotCrash()
+    public async Task InvokeAsync_ServiceAccount_WithTenantIdHeader_OverridesTenant()
     {
         TenantContext tenantContext = new TenantContext();
         TenantResolutionMiddleware middleware = CreateMiddleware();
@@ -200,14 +158,14 @@ public class TenantResolutionMiddlewareTests
         Guid overrideId = Guid.NewGuid();
 
         DefaultHttpContext context = CreateAuthenticatedContext(
-            new Claim("organization", orgId.ToString()),
-            new Claim("realm_access", "not-valid-json"));
+            new Claim("org_id", orgId.ToString()),
+            new Claim("azp", "sa-test-service"));
         context.Request.Headers["X-Tenant-Id"] = overrideId.ToString();
 
         await middleware.InvokeAsync(context, tenantContext);
 
-        // Should not override since realm_access is invalid and no admin role found
-        tenantContext.TenantId.Value.Should().Be(orgId);
+        tenantContext.IsResolved.Should().BeTrue();
+        tenantContext.TenantId.Value.Should().Be(overrideId);
     }
 
     private TenantResolutionMiddleware CreateMiddleware()

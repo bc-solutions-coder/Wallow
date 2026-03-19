@@ -268,7 +268,8 @@ try
 
     // Core services
     builder.Services.AddHttpContextAccessor();
-    builder.Services.AddControllers();
+    builder.Services.AddControllersWithViews();
+    builder.Services.AddRazorPages();
     builder.Services.AddApiVersioning(opts =>
     {
         opts.DefaultApiVersion = new ApiVersion(1);
@@ -401,7 +402,7 @@ try
     // API key authentication (checks X-Api-Key header first, falls through to JWT if not present)
     app.UseMiddleware<ApiKeyAuthenticationMiddleware>();
 
-    // Authentication (Keycloak OIDC JWT validation)
+    // Authentication (OpenIddict token validation)
     app.UseAuthentication();
 
     // Tenant resolution (reads org claim from JWT → populates ITenantContext)
@@ -414,7 +415,7 @@ try
     // SCIM authentication (Bearer token validation for /scim/v2/* endpoints)
     app.UseMiddleware<ScimAuthenticationMiddleware>();
 
-    // Permission expansion (reads Keycloak roles → expands to PermissionType claims)
+    // Permission expansion (reads roles → expands to PermissionType claims)
     app.UseMiddleware<PermissionExpansionMiddleware>();
 
     // Authorization (checks [HasPermission] attributes)
@@ -431,6 +432,7 @@ try
 
     // Endpoints
     app.MapControllers();
+    app.MapRazorPages();
 
     // Elsa Workflow engine (runs in all environments)
     app.UseWorkflows();

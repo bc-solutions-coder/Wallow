@@ -94,7 +94,8 @@ internal static class ServiceCollectionExtensions
                 tags: ["infrastructure", "ready"])
             .AddCheck("startup", () => HealthCheckResult.Healthy(),
                 tags: ["startup"])
-            .AddCheck<KeycloakHealthCheck>("keycloak", tags: ["infrastructure", "ready"]);
+            .AddCheck("startup-ready", () => HealthCheckResult.Healthy(),
+                tags: ["infrastructure", "ready"]);
 
         // RabbitMQ health check — only when RabbitMQ transport is active
         string transport = configuration.GetValue<string>("ModuleMessaging:Transport") ?? "InMemory";
@@ -279,20 +280,14 @@ internal static class ServiceCollectionExtensions
                     .AddEntityFrameworkCoreInstrumentation()
                     .AddHttpClientInstrumentation(options =>
                     {
-                        string keycloakBaseUrl = (configuration["Keycloak:auth-server-url"] ?? "").TrimEnd('/');
                         string s3Endpoint = (configuration["Storage:S3:Endpoint"] ?? "").TrimEnd('/');
 
                         options.EnrichWithHttpRequestMessage = (activity, message) =>
                         {
                             string requestUrl = message.RequestUri?.GetLeftPart(UriPartial.Authority) ?? "";
 
-                            if (!string.IsNullOrEmpty(keycloakBaseUrl) &&
-                                requestUrl.Equals(new Uri(keycloakBaseUrl).GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
-                            {
-                                activity.SetTag("http.provider", "keycloak");
-                            }
-                            else if (!string.IsNullOrEmpty(s3Endpoint) &&
-                                     requestUrl.Equals(new Uri(s3Endpoint).GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
+                            if (!string.IsNullOrEmpty(s3Endpoint) &&
+                                requestUrl.Equals(new Uri(s3Endpoint).GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
                             {
                                 activity.SetTag("http.provider", "s3");
                             }

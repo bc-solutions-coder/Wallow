@@ -10,7 +10,6 @@ using Foundry.Identity.Infrastructure.Extensions;
 using Foundry.Identity.Infrastructure.Scim;
 using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
-using Keycloak.AuthServices.Sdk.Admin.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

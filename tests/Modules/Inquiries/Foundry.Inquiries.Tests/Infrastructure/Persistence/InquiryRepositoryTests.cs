@@ -113,6 +113,66 @@ public class InquiryRepositoryTests(PostgresContainerFixture fixture)
     }
 
     [Fact]
+    public async Task GetBySubmitterAsync_ReturnsMatchingInquiries()
+    {
+        InquiryRepository repository = CreateRepository();
+        Inquiry inquiry1 = Inquiry.Create("Alice", "alice@example.com", "555-0100", "Acme", "submitter-1", "Web App", "$10k", "3 months", "First inquiry.", "1.2.3.4", TimeProvider.System);
+        inquiry1.ClearDomainEvents();
+        Inquiry inquiry2 = Inquiry.Create("Alice Again", "alice2@example.com", "555-0101", "Acme", "submitter-1", "Mobile App", "$20k", "6 months", "Second inquiry.", "1.2.3.4", TimeProvider.System);
+        inquiry2.ClearDomainEvents();
+        Inquiry inquiry3 = Inquiry.Create("Bob", "bob@example.com", "555-0200", "Other", "submitter-2", "API", "$5k", "1 month", "Bob's inquiry.", "5.6.7.8", TimeProvider.System);
+        inquiry3.ClearDomainEvents();
+
+        await repository.AddAsync(inquiry1, CancellationToken.None);
+        await repository.AddAsync(inquiry2, CancellationToken.None);
+        await repository.AddAsync(inquiry3, CancellationToken.None);
+        await DbContext.SaveChangesAsync();
+
+        IReadOnlyList<Inquiry> result = await repository.GetBySubmitterAsync("submitter-1", CancellationToken.None);
+
+        result.Should().HaveCount(2);
+        result.Should().AllSatisfy(i => i.SubmitterId.Should().Be("submitter-1"));
+    }
+
+    [Fact]
+    public async Task GetBySubmitterAsync_WhenNoMatch_ReturnsEmptyList()
+    {
+        InquiryRepository repository = CreateRepository();
+        Inquiry inquiry = Inquiry.Create("Alice", "alice@example.com", "555-0100", "Acme", "submitter-1", "Web App", "$10k", "3 months", "Inquiry.", "1.2.3.4", TimeProvider.System);
+        inquiry.ClearDomainEvents();
+
+        await repository.AddAsync(inquiry, CancellationToken.None);
+        await DbContext.SaveChangesAsync();
+
+        IReadOnlyList<Inquiry> result = await repository.GetBySubmitterAsync("nonexistent-submitter", CancellationToken.None);
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetBySubmitterAsync_ReturnsOrderedByCreatedAtDescending()
+    {
+        InquiryRepository repository = CreateRepository();
+        Inquiry first = Inquiry.Create("First", "first@example.com", "555-0100", "Acme", "submitter-1", "Web App", "$10k", "3 months", "First.", "1.2.3.4", TimeProvider.System);
+        first.ClearDomainEvents();
+
+        await repository.AddAsync(first, CancellationToken.None);
+        await DbContext.SaveChangesAsync();
+        await Task.Delay(10);
+
+        Inquiry second = Inquiry.Create("Second", "second@example.com", "555-0101", "Acme", "submitter-1", "Mobile App", "$20k", "6 months", "Second.", "1.2.3.4", TimeProvider.System);
+        second.ClearDomainEvents();
+
+        await repository.AddAsync(second, CancellationToken.None);
+        await DbContext.SaveChangesAsync();
+
+        IReadOnlyList<Inquiry> result = await repository.GetBySubmitterAsync("submitter-1", CancellationToken.None);
+
+        result[0].Name.Should().Be("Second");
+        result[1].Name.Should().Be("First");
+    }
+
+    [Fact]
     public async Task AddAsync_PersistsAllFields()
     {
         InquiryRepository repository = CreateRepository();

@@ -1,34 +1,26 @@
-using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Foundry.Identity.Application.DTOs;
 using Foundry.Identity.Application.Interfaces;
 using Foundry.Identity.Domain.Entities;
 using Foundry.Identity.Domain.Identity;
-using Foundry.Identity.Infrastructure.Extensions;
 using Foundry.Shared.Kernel.Domain;
-using Foundry.Shared.Kernel.Identity;
 using Foundry.Shared.Kernel.MultiTenancy;
 using Foundry.Shared.Kernel.Services;
-using Keycloak.AuthServices.Authentication;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using OpenIddict.Abstractions;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Foundry.Identity.Infrastructure.Services;
 
-public sealed partial class KeycloakServiceAccountService(
-    IHttpClientFactory httpClientFactory,
+public sealed partial class OpenIddictServiceAccountService(
+    IOpenIddictApplicationManager applicationManager,
     IServiceAccountRepository repository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    IOptions<KeycloakAuthenticationOptions> keycloakOptions,
-    IOptions<KeycloakOptions> keycloakRealmOptions,
     TimeProvider timeProvider,
-    ILogger<KeycloakServiceAccountService> logger) : IServiceAccountService
+    ILogger<OpenIddictServiceAccountService> logger) : IServiceAccountService
 {
-    private readonly HttpClient _httpClient = httpClientFactory.CreateClient("KeycloakAdminClient");
-    private readonly KeycloakAuthenticationOptions _keycloakOptions = keycloakOptions.Value;
-    private readonly string _realm = keycloakRealmOptions.Value.Realm;
-
     public async Task<ServiceAccountCreatedResult> CreateAsync(CreateServiceAccountRequest request, CancellationToken ct = default)
     {
         TenantId tenantId = tenantContext.TenantId;
@@ -36,45 +28,34 @@ public sealed partial class KeycloakServiceAccountService(
 
         LogCreatingServiceAccount(clientId, tenantId.Value);
 
-        // Create Keycloak client with client_credentials grant
-        var clientRepresentation = new
+        string clientSecret = GenerateClientSecret();
+
+        List<string> permissions =
+        [
+            Permissions.Endpoints.Token,
+            Permissions.GrantTypes.ClientCredentials
+        ];
+
+        foreach (string scope in request.Scopes)
         {
-            clientId,
-            name = request.Name,
-            description = request.Description,
-            enabled = true,
-            serviceAccountsEnabled = true,
-            standardFlowEnabled = false,        // No browser login
-            directAccessGrantsEnabled = false,  // No password grant
-            publicClient = false,               // Confidential client
-            defaultClientScopes = request.Scopes.ToList(),
-            attributes = new Dictionary<string, string>
-            {
-                ["tenant_id"] = tenantId.Value.ToString()
-            }
+            permissions.Add(Permissions.Prefixes.Scope + scope);
+        }
+
+        OpenIddictApplicationDescriptor descriptor = new()
+        {
+            ClientId = clientId,
+            ClientSecret = clientSecret,
+            DisplayName = request.Name,
+            ClientType = ClientTypes.Confidential,
+            Permissions = { }
         };
 
-        HttpResponseMessage createResponse = await _httpClient.PostAsJsonAsync(
-            $"/admin/realms/{_realm}/clients",
-            clientRepresentation,
-            ct);
-        await createResponse.EnsureSuccessOrThrowAsync();
-
-        // Get the client's internal ID from the Location header
-        string? locationHeader = createResponse.Headers.Location?.ToString();
-        if (string.IsNullOrWhiteSpace(locationHeader))
+        foreach (string permission in permissions)
         {
-            throw new InvalidOperationException("Client created but Location header is missing");
+            descriptor.Permissions.Add(permission);
         }
-        string internalClientId = locationHeader.Split('/').Last();
 
-        // Get the generated client secret
-        HttpResponseMessage secretResponse = await _httpClient.GetAsync(
-            $"/admin/realms/{_realm}/clients/{internalClientId}/client-secret",
-            ct);
-        await secretResponse.EnsureSuccessOrThrowAsync();
-        ClientSecretResponse? secretData = await secretResponse.Content.ReadFromJsonAsync<ClientSecretResponse>(ct);
-        string clientSecret = secretData?.Value ?? throw new InvalidOperationException("Failed to retrieve client secret");
+        await applicationManager.CreateAsync(descriptor, ct);
 
         // Store local metadata
         ServiceAccountMetadata metadata = ServiceAccountMetadata.Create(
@@ -91,13 +72,11 @@ public sealed partial class KeycloakServiceAccountService(
 
         LogServiceAccountCreated(clientId, metadata.Id);
 
-        string tokenEndpoint = $"{_keycloakOptions.AuthServerUrl}/realms/{_realm}/protocol/openid-connect/token";
-
         return new ServiceAccountCreatedResult(
             metadata.Id,
             clientId,
             clientSecret,
-            tokenEndpoint,
+            "/connect/token",
             request.Scopes.ToList());
     }
 
@@ -147,18 +126,15 @@ public sealed partial class KeycloakServiceAccountService(
 
         LogRotatingSecret(metadata.KeycloakClientId);
 
-        // First, get the client's internal ID
-        string internalClientId = await GetKeycloakClientInternalIdAsync(metadata.KeycloakClientId, ct);
+        object? application = await applicationManager.FindByClientIdAsync(metadata.KeycloakClientId, ct)
+            ?? throw new InvalidOperationException($"OpenIddict application '{metadata.KeycloakClientId}' not found");
 
-        // Regenerate the client secret in Keycloak
-        HttpResponseMessage response = await _httpClient.PostAsync(
-            $"/admin/realms/{_realm}/clients/{internalClientId}/client-secret",
-            null,
-            ct);
-        await response.EnsureSuccessOrThrowAsync();
+        string newSecret = GenerateClientSecret();
 
-        ClientSecretResponse? secretData = await response.Content.ReadFromJsonAsync<ClientSecretResponse>(ct);
-        string newSecret = secretData?.Value ?? throw new InvalidOperationException("Failed to regenerate client secret");
+        OpenIddictApplicationDescriptor descriptor = new();
+        await applicationManager.PopulateAsync(descriptor, application, ct);
+        descriptor.ClientSecret = newSecret;
+        await applicationManager.UpdateAsync(application, descriptor, ct);
 
         LogSecretRotated(metadata.KeycloakClientId);
 
@@ -177,19 +153,20 @@ public sealed partial class KeycloakServiceAccountService(
 
         LogUpdatingScopes(metadata.KeycloakClientId);
 
-        // Update in Keycloak
-        string internalClientId = await GetKeycloakClientInternalIdAsync(metadata.KeycloakClientId, ct);
+        object? application = await applicationManager.FindByClientIdAsync(metadata.KeycloakClientId, ct)
+            ?? throw new InvalidOperationException($"OpenIddict application '{metadata.KeycloakClientId}' not found");
 
-        var updatePayload = new
+        OpenIddictApplicationDescriptor descriptor = new();
+        await applicationManager.PopulateAsync(descriptor, application, ct);
+
+        // Remove existing scope permissions and re-add with new scopes
+        descriptor.Permissions.RemoveWhere(p => p.StartsWith(Permissions.Prefixes.Scope, StringComparison.Ordinal));
+        foreach (string scope in scopesList)
         {
-            defaultClientScopes = scopesList
-        };
+            descriptor.Permissions.Add(Permissions.Prefixes.Scope + scope);
+        }
 
-        HttpResponseMessage response = await _httpClient.PutAsJsonAsync(
-            $"/admin/realms/{_realm}/clients/{internalClientId}",
-            updatePayload,
-            ct);
-        await response.EnsureSuccessOrThrowAsync();
+        await applicationManager.UpdateAsync(application, descriptor, ct);
 
         // Update local metadata
         metadata.UpdateScopes(scopesList, currentUserService.UserId ?? Guid.Empty, timeProvider);
@@ -208,13 +185,11 @@ public sealed partial class KeycloakServiceAccountService(
 
         LogRevokingServiceAccount(metadata.KeycloakClientId);
 
-        // Delete from Keycloak
-        string internalClientId = await GetKeycloakClientInternalIdAsync(metadata.KeycloakClientId, ct);
-
-        HttpResponseMessage response = await _httpClient.DeleteAsync(
-            $"/admin/realms/{_realm}/clients/{internalClientId}",
-            ct);
-        await response.EnsureSuccessOrThrowAsync();
+        object? application = await applicationManager.FindByClientIdAsync(metadata.KeycloakClientId, ct);
+        if (application is not null)
+        {
+            await applicationManager.DeleteAsync(application, ct);
+        }
 
         // Soft delete locally
         metadata.Revoke(currentUserService.UserId ?? Guid.Empty, timeProvider);
@@ -223,22 +198,10 @@ public sealed partial class KeycloakServiceAccountService(
         LogServiceAccountRevoked(metadata.KeycloakClientId);
     }
 
-    private async Task<string> GetKeycloakClientInternalIdAsync(string clientId, CancellationToken ct)
+    private static string GenerateClientSecret()
     {
-        HttpResponseMessage response = await _httpClient.GetAsync(
-            $"/admin/realms/{_realm}/clients?clientId={clientId}",
-            ct);
-        await response.EnsureSuccessOrThrowAsync();
-
-        List<KeycloakClientResponse>? clients = await response.Content.ReadFromJsonAsync<List<KeycloakClientResponse>>(ct);
-        KeycloakClientResponse? client = clients?.FirstOrDefault();
-
-        if (client?.Id is null)
-        {
-            throw new InvalidOperationException($"Keycloak client '{clientId}' not found");
-        }
-
-        return client.Id;
+        byte[] bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(bytes);
     }
 
     [GeneratedRegex("[^a-z0-9]+", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
@@ -247,12 +210,6 @@ public sealed partial class KeycloakServiceAccountService(
     private static string Slugify(string name)
         => SlugifyRegex().Replace(name.ToLowerInvariant(), "-").Trim('-');
 
-    private sealed record ClientSecretResponse(string? Value);
-    private sealed record KeycloakClientResponse(string? Id, string? ClientId);
-}
-
-public sealed partial class KeycloakServiceAccountService
-{
     [LoggerMessage(Level = LogLevel.Information, Message = "Creating service account {ClientId} for tenant {TenantId}")]
     private partial void LogCreatingServiceAccount(string clientId, Guid tenantId);
 

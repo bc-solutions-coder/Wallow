@@ -135,14 +135,13 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IUserManagementService, UserManagementService>();
         services.AddScoped<ITokenService, KeycloakTokenService>();
         services.AddScoped<IApiKeyService, RedisApiKeyService>();
-        services.AddScoped<IServiceAccountService, KeycloakServiceAccountService>();
-        services.AddScoped<SsoClaimsSyncService>();
-        services.AddScoped<ISsoService, KeycloakSsoService>();
+        services.AddScoped<IServiceAccountService, OpenIddictServiceAccountService>();
+        services.AddScoped<ISsoService, OidcFederationService>();
         services.AddScoped<ScimUserService>();
         services.AddScoped<ScimGroupService>();
         services.AddScoped<IScimService, ScimService>();
         services.AddScoped<IOrganizationService, OrganizationService>();
-        services.AddScoped<IDeveloperAppService, KeycloakDeveloperAppService>();
+        services.AddScoped<IDeveloperAppService, OpenIddictDeveloperAppService>();
         services.AddScoped<Foundry.Shared.Contracts.Identity.IUserService, UserService>();
         services.AddScoped<Foundry.Shared.Contracts.Identity.IUserQueryService, UserQueryService>();
     }

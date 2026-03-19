@@ -57,3 +57,4 @@ docker/.env
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+.superpowers/

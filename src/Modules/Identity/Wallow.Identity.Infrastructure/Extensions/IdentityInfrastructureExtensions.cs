@@ -39,7 +39,8 @@ public static class IdentityInfrastructureExtensions
             .AddCore(options =>
             {
                 options.UseEntityFrameworkCore()
-                    .UseDbContext<IdentityDbContext>();
+                    .UseDbContext<IdentityDbContext>()
+                    .ReplaceDefaultEntities<Guid>();
             })
             .AddServer(options =>
             {

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Wallow.Showcases.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using Wallow.Showcases.Infrastructure.Persistence;
 namespace Wallow.Showcases.Infrastructure.Migrations
 {
     [DbContext(typeof(ShowcasesDbContext))]
-    partial class ShowcasesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260320005852_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

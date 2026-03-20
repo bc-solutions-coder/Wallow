@@ -14,8 +14,8 @@ public class BillingDbContextFactory : IDesignTimeDbContextFactory<BillingDbCont
         DbContextOptionsBuilder<BillingDbContext> optionsBuilder = new();
 
         // Use a placeholder connection string for design-time
-        string password = Environment.GetEnvironmentVariable("WALLOW_DB_PASSWORD") ?? "postgres";
-        optionsBuilder.UseNpgsql($"Host=localhost;Database=wallow;Username=postgres;Password={password}");
+        string password = Environment.GetEnvironmentVariable("WALLOW_DB_PASSWORD") ?? "wallow";
+        optionsBuilder.UseNpgsql($"Host=localhost;Database=wallow;Username=wallow;Password={password}");
 
         // Create a mock tenant context for design-time
         DesignTimeTenantContext mockTenantContext = new();

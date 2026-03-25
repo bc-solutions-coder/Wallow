@@ -25,7 +25,7 @@ A bead is any unit of work: a task file in `docs/plans/tasks/`, a ticket descrip
 
 ## Project Architecture
 
-This is a modular monolith with these modules: Identity, Storage, Billing, Configuration, Communications.
+This is a modular monolith with these modules: Identity, Storage, Billing, Notifications, Messaging, Announcements, Inquiries, Branding, ApiKeys.
 
 Each module follows Clean Architecture:
 - **Domain** → Entities, Value Objects, Domain Events (zero dependencies)
@@ -34,10 +34,10 @@ Each module follows Clean Architecture:
 - **Api** → Controllers, Request/Response contracts (depends on Application)
 
 Key rules:
-- Modules communicate via events over RabbitMQ through `Shared.Contracts`, never direct references.
+- Modules communicate via events over Wolverine in-memory bus through `Shared.Contracts`, never direct references.
 - Each module owns its own database tables in separate schemas.
 - EF Core for writes, Dapper for complex reads.
-- Wolverine for CQRS mediation and RabbitMQ transport.
+- Wolverine for CQRS mediation and in-memory messaging.
 - FluentValidation for input validation.
 - .NET 10 is the target framework.
 
@@ -70,23 +70,36 @@ Key rules:
 - Comments should explain WHY, not WHAT. The code tells you what; the comment tells you why.
 - Never add noise comments like `// Constructor` above a constructor or `// Gets the name` above `GetName()`.
 
-## Implementation Process
+## Implementation Process (TDD)
 
 When you receive a bead:
 
 1. **Read the bead** — Read any referenced task files, specs, or instructions completely. Use file reading tools.
 2. **Scan existing code** — Look at the module's current structure, existing patterns, naming conventions, and what's already built. Match the style.
 3. **State your plan** — In 3-7 bullet points, state what you will do. Be concrete: name the files, classes, and methods.
-4. **Implement** — Write the code. Use the project's established patterns. Match existing code style exactly.
-5. **Verify** — Run `dotnet build` to confirm compilation. If tests are relevant, run them.
-6. **Report** — Give a concise summary of what was done: files created/modified, key decisions made, anything the parent agent needs to know.
+4. **Scaffold types (no logic)** — Create structural code: entities, commands, DTOs, interfaces, empty handler classes. Just enough for tests to compile. No business logic yet.
+5. **Write tests** — Write tests asserting expected behavior. Cover the happy path, key edge cases, and error cases described in the spec. Use existing test patterns in the module.
+6. **Confirm red** — Run `./scripts/run-tests.sh <module>` — tests must FAIL. If tests pass, the behavior already exists or the test is wrong. Investigate before proceeding.
+7. **Implement logic** — Write the minimal code to make all tests pass. Do NOT modify test files during this step.
+8. **Confirm green** — Run `./scripts/run-tests.sh <module>` — all tests must PASS.
+9. **Refactor** — Clean up duplication or naming issues. Re-run tests to confirm they still pass.
+10. **Report** — Concise summary of what was done.
+
+## TDD Rules
+
+- **Structural code before tests is allowed.** Types, DTOs, interfaces, empty classes — anything the test needs to compile.
+- **Logic before tests is NOT allowed.** Never write business logic, validation, or handler behavior before the test exists.
+- **Do not modify tests to make them pass.** If a test is wrong, that's a separate step. During implementation (step 7), only touch production code.
+- **If tests accidentally pass after step 6**, investigate: either the behavior already exists (skip implementation) or the test isn't testing what you think (fix the test, re-confirm red, then implement).
+- **Use `./scripts/run-tests.sh <module>`** — never bare `dotnet test`. The script provides structured output with per-assembly pass/fail counts.
 
 ## Response Format
 
 Keep responses SHORT. You are one of potentially many parallel agents. Your parent agent needs:
-- ✅ What was done (1-3 sentences)
-- 📁 Files created or modified (bulleted list)
-- ⚠️ Any issues, blockers, or decisions that need escalation (if any)
+- What was done (1-3 sentences)
+- Files created or modified (bulleted list)
+- Test results: X passed, Y failed (from run-tests.sh output)
+- Any issues, blockers, or decisions that need escalation (if any)
 - Nothing else. No lengthy explanations. No restating the requirements back.
 
 ## Build Commands
@@ -95,19 +108,22 @@ Keep responses SHORT. You are one of potentially many parallel agents. Your pare
 # Build the solution
 dotnet build
 
-# Run tests
-dotnet test
+# Run all tests (structured output)
+./scripts/run-tests.sh
 
 # Run specific module tests
-dotnet test tests/Modules/Billing/Billing.Domain.Tests
+./scripts/run-tests.sh billing
+./scripts/run-tests.sh identity
+# Supported: identity, billing, storage, notifications, messaging, announcements,
+#            inquiries, branding, apikeys, auth, api, arch, shared, kernel, integration
 
 # Run the API
-dotnet run --project src/Foundry.Api
+dotnet run --project src/Wallow.Api
 
 # EF Core migrations
 dotnet ef migrations add MigrationName \
-    --project src/Modules/{Module}/Foundry.{Module}.Infrastructure \
-    --startup-project src/Foundry.Api \
+    --project src/Modules/{Module}/Wallow.{Module}.Infrastructure \
+    --startup-project src/Wallow.Api \
     --context {Module}DbContext
 ```
 

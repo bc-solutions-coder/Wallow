@@ -37,7 +37,7 @@ Found **25+ simple EF Core queries across 5 modules** that are prime candidates 
 
 ### **IDENTITY MODULE**
 - **ServiceAccountRepository.GetByIdAsync()** — `FirstOrDefaultAsync(x => x.Id == id)` + Where filter
-- **ServiceAccountRepository.GetByKeycloakClientIdAsync()** — `FirstOrDefaultAsync(x => x.KeycloakClientId == keycloakClientId)` + IgnoreQueryFilters() (middleware hotpath)
+- **ServiceAccountRepository.GetByClientIdAsync()** — `FirstOrDefaultAsync(x => x.ClientId == clientId)` + IgnoreQueryFilters() (middleware hotpath)
 - **SsoConfigurationRepository.GetAsyncReadOnly()** — simple `FirstOrDefaultAsync()`
 - **ScimConfigurationRepository.GetAsyncReadOnly()** — simple `FirstOrDefaultAsync()`
 - **ApiScopeRepository** — (need to verify, likely simple lookups)
@@ -95,7 +95,7 @@ Found **25+ simple EF Core queries across 5 modules** that are prime candidates 
 |------------|--------|---------|-----------|
 | FeatureFlagRepository | GetByIdAsync | ID lookup | Per request (cache miss) |
 | FeatureFlagRepository | GetByKeyAsync | String key lookup | Per request (cache miss) |
-| ServiceAccountRepository | GetByKeycloakClientIdAsync | String lookup + IgnoreQueryFilters | Every request (middleware) |
+| ServiceAccountRepository | GetByClientIdAsync | String lookup + IgnoreQueryFilters | Every request (middleware) |
 | StorageBucketRepository | GetByNameAsync | String lookup | High (file operations) |
 | AnnouncementRepository | GetByIdAsync | ID lookup | Moderate |
 | InvoiceRepository | GetByIdAsync | ID lookup | High (CRUD operations) |
@@ -168,7 +168,7 @@ Found **25+ simple EF Core queries across 5 modules** that are prime candidates 
 ### Tier 1 (Implement First)
 1. **FeatureFlagRepository.GetByIdAsync()** - Global config hotpath
 2. **FeatureFlagRepository.GetByKeyAsync()** - Global config hotpath
-3. **ServiceAccountRepository.GetByKeycloakClientIdAsync()** - Middleware hotpath
+3. **ServiceAccountRepository.GetByClientIdAsync()** - Middleware hotpath
 4. **StorageBucketRepository.GetByNameAsync()** - High-frequency file operations
 5. **InvoiceRepository.GetByIdAsync()** - High CRUD volume
 

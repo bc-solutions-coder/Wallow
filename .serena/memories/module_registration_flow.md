@@ -600,7 +600,7 @@ Standard conventions:
 
 ```
 Wallow.Api (composition root)
-├─ Identity → Keycloak, JWT, TenantContext, Permissions
+├─ Identity → OpenIddict, ASP.NET Core Identity, JWT, TenantContext, Permissions
 ├─ Billing → Invoices, Subscriptions, Payment processing
 ├─ Communications → Messaging, notifications, email delivery
 ├─ Configuration → Tenant/system configuration, feature flags

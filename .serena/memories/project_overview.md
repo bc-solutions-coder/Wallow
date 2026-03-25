@@ -16,7 +16,7 @@ Wallow is a **production-ready .NET modular monolith base platform** with multi-
 | ORM | EF Core + Dapper |
 | CQRS & Messaging | Wolverine (mediator + RabbitMQ transport) |
 | Real-time | SignalR |
-| Identity Provider | Keycloak 26 |
+| Identity Provider | OpenIddict + ASP.NET Core Identity |
 | Validation | FluentValidation |
 | Testing | xUnit, Testcontainers, FluentAssertions |
 
@@ -25,6 +25,6 @@ The project is currently in **early development** - foundation structure exists 
 
 ## Key Documentation
 - Design document: `docs/plans/2026-02-04-wallow-pivot-design.md`
-- Keycloak design: `docs/plans/2026-02-05-keycloak-integration-design.md`
+- Identity design: `docs/plans/2026-02-05-identity-integration-design.md`
 - Developer guide: `docs/DEVELOPER_GUIDE.md`
 - Forking guide: `docs/FORKING_GUIDE.md`

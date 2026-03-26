@@ -1,26 +1,38 @@
-name: Security
+name: CodeQL
 
 on:
   push:
-    branches: [main, expansion]
+    branches: [main]
   pull_request:
     branches: [main]
   schedule:
     - cron: '0 6 * * 1'
 
 jobs:
-  codeql:
+  analyze:
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
 
     permissions:
       security-events: write
+      packages: read
       actions: read
       contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: csharp
+            build-mode: manual
 
     steps:
       - uses: actions/checkout@v6
 
       - name: Setup .NET
+        if: matrix.language == 'csharp'
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
@@ -28,11 +40,14 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
-          languages: csharp
-          build-mode: manual
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
 
       - name: Build
+        if: matrix.build-mode == 'manual'
         run: dotnet build --no-incremental
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

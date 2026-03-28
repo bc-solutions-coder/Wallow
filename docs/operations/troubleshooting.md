@@ -122,7 +122,7 @@ docker compose up -d postgres
 ```
 FATAL: no pg_hba.conf entry for host
 ```
-Check `docker/init-db.sql` and ensure the database user has proper permissions.
+Check that the database user has proper permissions. Module schemas are created automatically by EF Core migrations on startup.
 
 ### Valkey/Redis Connection Problems
 

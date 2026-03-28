@@ -14,7 +14,6 @@ services:
       POSTGRES_DB: wallow_test
     volumes:
       - test_postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
     ports:
       - "127.0.0.1:5442:5432"
     healthcheck:

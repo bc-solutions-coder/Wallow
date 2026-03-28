@@ -32,7 +32,10 @@ resolve_filter() {
         auth-components) echo "$REPO_ROOT/tests/Wallow.Auth.Component.Tests" ;;
         web)             echo "$REPO_ROOT/tests/Wallow.Web.Tests" ;;
         web-components)  echo "$REPO_ROOT/tests/Wallow.Web.Component.Tests" ;;
-        e2e)             echo "$REPO_ROOT/tests/Wallow.E2E.Tests" ;;
+        e2e)
+            echo "ERROR: E2E tests must be run via ./scripts/run-e2e.sh (requires live infrastructure)." >&2
+            exit 1
+            ;;
         api)             echo "$REPO_ROOT/tests/Wallow.Api.Tests" ;;
         arch|architecture) echo "$REPO_ROOT/tests/Wallow.Architecture.Tests" ;;
         shared)          echo "$REPO_ROOT/tests/Wallow.Shared.Infrastructure.Tests" ;;

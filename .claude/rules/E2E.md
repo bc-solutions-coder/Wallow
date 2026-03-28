@@ -13,10 +13,10 @@
 ./scripts/run-e2e.sh
 ```
 
-This builds Docker images, starts the full test stack (`docker-compose.test.yml`), runs E2E tests, and tears everything down. No manual setup required.
+This builds the solution once on the host, publishes container images via `dotnet publish /t:PublishContainer`, builds migration bundles, starts the full test stack (`docker-compose.test.yml`), runs E2E tests, and tears everything down. No manual setup required.
 
 **Useful flags:**
-- `--no-build` — skip image build if images already exist
+- `--no-build` — skip build and image publish (reuse existing images)
 - `--keep` — leave containers running after tests (for debugging or re-runs)
 - `--headed` — see the browser
 - `--video` / `--tracing` — capture test artifacts
@@ -24,7 +24,7 @@ This builds Docker images, starts the full test stack (`docker-compose.test.yml`
 **For iterative debugging** (faster feedback loop after first run):
 
 ```bash
-./scripts/run-e2e.sh --keep          # First run: build + start + test, leave running
+./scripts/run-e2e.sh --keep             # First run: build + publish + test, leave running
 ./scripts/run-e2e.sh --no-build --keep  # Re-runs: just run tests against running stack
 ```
 

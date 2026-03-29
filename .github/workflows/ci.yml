@@ -164,7 +164,6 @@ jobs:
           retention-days: 5
 
   docker-images:
-    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -172,80 +171,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v5
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-
-      - name: Restore build output
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            **/bin/Release
-            **/obj
-          key: build-${{ runner.os }}-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Publish API container image
-        run: dotnet publish src/Wallow.Api/Wallow.Api.csproj -c Release /t:PublishContainer -p:ContainerImageTag=test -p:ContainerRepository=wallow-api --no-build
-
-      - name: Publish Auth container image
-        run: dotnet publish src/Wallow.Auth/Wallow.Auth.csproj -c Release /t:PublishContainer -p:ContainerImageTag=test -p:ContainerRepository=wallow-auth --no-build
-
-      - name: Publish Web container image
-        run: dotnet publish src/Wallow.Web/Wallow.Web.csproj -c Release /t:PublishContainer -p:ContainerImageTag=test -p:ContainerRepository=wallow-web --no-build
-
-      - name: Build migration bundles
-        run: |
-          dotnet tool restore
-          MODULES=(
-            "Identity:IdentityDbContext"
-            "Billing:BillingDbContext"
-            "Storage:StorageDbContext"
-            "Notifications:NotificationsDbContext"
-            "Messaging:MessagingDbContext"
-            "Announcements:AnnouncementsDbContext"
-            "ApiKeys:ApiKeysDbContext"
-            "Branding:BrandingDbContext"
-            "Inquiries:InquiriesDbContext"
-          )
-          mkdir -p bundles
-          for entry in "${MODULES[@]}"; do
-            module="${entry%%:*}"
-            context="${entry##*:}"
-            dotnet ef migrations bundle \
-              --project "src/Modules/${module}/Wallow.${module}.Infrastructure/Wallow.${module}.Infrastructure.csproj" \
-              --startup-project src/Wallow.Api/Wallow.Api.csproj \
-              --context "$context" --output "bundles/efbundle-$(echo "$module" | tr '[:upper:]' '[:lower:]')" \
-              --configuration Release --force --no-build
-          done
-          dotnet ef migrations bundle \
-            --project src/Shared/Wallow.Shared.Infrastructure.Core/Wallow.Shared.Infrastructure.Core.csproj \
-            --startup-project src/Wallow.Api/Wallow.Api.csproj \
-            --context AuditDbContext --output bundles/efbundle-audit \
-            --configuration Release --force --no-build
-
-      - name: Build migrations container image
-        run: |
-          docker build -f - -t wallow-migrations:test . <<'DOCKERFILE'
-          FROM mcr.microsoft.com/dotnet/aspnet:10.0
-          WORKDIR /app
-          COPY bundles/ bundles/
-          COPY scripts/apply-migrations.sh .
-          RUN chmod +x apply-migrations.sh
-          ENTRYPOINT ["./apply-migrations.sh"]
-          DOCKERFILE
+      - name: Build all test images
+        run: docker compose -f docker/docker-compose.test.yml build
 
       - name: Save container images to cache
-        run: docker save wallow-api:test wallow-auth:test wallow-web:test wallow-migrations:test | gzip > /tmp/wallow-images.tar.gz
+        run: docker save wallow-api:test wallow-auth:test wallow-web:test wallow-garage:test | gzip > /tmp/wallow-images.tar.gz
 
       - name: Cache container images
         uses: actions/cache/save@v5
@@ -254,7 +184,7 @@ jobs:
           key: images-${{ runner.os }}-${{ github.sha }}
 
   e2e:
-    needs: docker-images
+    needs: [build, docker-images]
     runs-on: ubuntu-latest
 
     permissions:
@@ -413,7 +343,6 @@ jobs:
             ["wallow-api:test"]="${IMAGE_BASE}"
             ["wallow-auth:test"]="${IMAGE_BASE}-auth"
             ["wallow-web:test"]="${IMAGE_BASE}-web"
-            ["wallow-migrations:test"]="${IMAGE_BASE}-migrations"
           )
           for local_tag in "${!IMAGE_MAP[@]}"; do
             remote="${IMAGE_MAP[$local_tag]}"

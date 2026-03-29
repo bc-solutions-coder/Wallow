@@ -538,7 +538,14 @@ try
     }
 
     // API key authentication (checks X-Api-Key header first, falls through to JWT if not present)
-    app.UseMiddleware<ApiKeyAuthenticationMiddleware>();
+    // Only register when ApiKeys module is enabled — the middleware depends on IApiKeyService
+    {
+        IFeatureManager apiKeyFeatureCheck = app.Services.GetRequiredService<IFeatureManager>();
+        if (await apiKeyFeatureCheck.IsEnabledAsync("Modules.ApiKeys"))
+        {
+            app.UseMiddleware<ApiKeyAuthenticationMiddleware>();
+        }
+    }
 
     // Authentication (OpenIddict token validation)
     app.UseAuthentication();

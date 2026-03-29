@@ -62,6 +62,7 @@ internal sealed class SecurityHeadersMiddleware(RequestDelegate next, IWebHostEn
                    "style-src 'self' 'unsafe-inline'";
         }
 
-        return "default-src 'self'";
+        return "default-src 'self'; " +
+               "script-src 'self' https://static.cloudflareinsights.com";
     }
 }

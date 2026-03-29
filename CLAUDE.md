@@ -11,6 +11,10 @@ cd docker && docker compose up -d
 # Start infrastructure with ClamAV virus scanning
 cd docker && docker compose --profile clamav up -d
 
+# Run full production stack locally (API + Auth + Web + all infra)
+cd docker && cp .env.production.example .env.production  # edit secrets first
+cd docker && docker compose -f docker-compose.production.yml --env-file .env.production up --build
+
 # Run the API
 dotnet run --project src/Wallow.Api
 

@@ -48,22 +48,19 @@ services:
       - wallow-test
 
   garage:
+    image: wallow-garage:test
     build:
-      context: ./garage
-      dockerfile: Dockerfile
-    image: wallow-garage:v2.2.0-test
-    entrypoint: ["/bin/sh", "/etc/garage/init-garage.sh"]
-    volumes:
-      - test_garage_meta:/var/lib/garage/meta
-      - test_garage_data:/var/lib/garage/data
-      - ./garage/garage.toml:/etc/garage/garage.toml:ro
-      - ./garage/init-garage.sh:/etc/garage/init-garage.sh:ro
+      context: ./images/garage
     environment:
-      GARAGE_CONFIG_FILE: /etc/garage/garage.toml
+      GARAGE_RPC_SECRET: test-rpc-secret-000000000000000000000000000000000000000000000000000000000000
+      GARAGE_ADMIN_TOKEN: test-admin-token
       GARAGE_KEY_NAME: wallow-test
       GARAGE_ACCESS_KEY: GK0123456789abcdef01234567
       GARAGE_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       GARAGE_BUCKET: wallow-test-files
+    volumes:
+      - test_garage_meta:/var/lib/garage/meta
+      - test_garage_data:/var/lib/garage/data
     ports:
       - "127.0.0.1:3910:3900"
       - "127.0.0.1:3913:3903"
@@ -76,23 +73,13 @@ services:
       - wallow-test
 
   # ============================================
-  # DATABASE MIGRATIONS (init container)
-  # ============================================
-  wallow-migrations:
-    image: wallow-migrations:test
-    environment:
-      CONNECTION_STRING: "Host=postgres;Port=5432;Database=wallow_test;Username=wallow_test;Password=wallow_test"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - wallow-test
-
-  # ============================================
   # APPLICATION SERVICES
   # ============================================
   wallow-api:
     image: wallow-api:test
+    build:
+      context: ..
+      dockerfile: docker/images/api/Dockerfile
     ports:
       - "5050:8080"
     environment:
@@ -100,8 +87,11 @@ services:
       ASPNETCORE_URLS: http://+:8080
       # Override HTTPS_PORT from appsettings.Development.json to prevent HTTPS redirect
       HTTPS_PORT: ""
+      CONNECTION_STRING: "Host=postgres;Port=5432;Database=wallow_test;Username=wallow_test;Password=wallow_test"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=wallow_test;Username=wallow_test;Password=wallow_test"
       ConnectionStrings__Redis: "valkey:6379,password=WallowTestValkey123!,abortConnect=false"
+      OPENIDDICT_SIGNING_CERT_PASSWORD: test-signing
+      OPENIDDICT_ENCRYPTION_CERT_PASSWORD: test-encryption
       Smtp__Host: mailpit
       Smtp__Port: "1025"
       Storage__Provider: S3
@@ -118,9 +108,13 @@ services:
       PreRegisteredClients__Clients__1__PostLogoutRedirectUris__0: "http://localhost:5053/signout-callback-oidc"
       # Fix OIDC issuer so browser-facing tokens match the authority clients expect (localhost)
       OpenIddict__Issuer: "http://localhost:5050"
+    tmpfs:
+      - /tmp
+      - /app/App_Data
+      - /app/certs
     depends_on:
-      wallow-migrations:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       valkey:
         condition: service_healthy
       garage:
@@ -130,6 +124,9 @@ services:
 
   wallow-auth:
     image: wallow-auth:test
+    build:
+      context: ..
+      dockerfile: docker/images/auth/Dockerfile
     ports:
       - "127.0.0.1:5051:8080"
     extra_hosts:
@@ -147,6 +144,9 @@ services:
 
   wallow-web:
     image: wallow-web:test
+    build:
+      context: ..
+      dockerfile: docker/images/web/Dockerfile
     ports:
       - "127.0.0.1:5053:8080"
     extra_hosts:

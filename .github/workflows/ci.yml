@@ -216,6 +216,9 @@ jobs:
           key: build-${{ runner.os }}-${{ github.sha }}
           fail-on-cache-miss: true
 
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
       - name: Publish .NET container images
         run: |
           dotnet publish src/Wallow.Api/Wallow.Api.csproj \

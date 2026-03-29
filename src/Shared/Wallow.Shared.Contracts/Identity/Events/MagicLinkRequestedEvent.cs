@@ -11,4 +11,6 @@ public sealed record MagicLinkRequestedEvent : IntegrationEvent
     public required Guid TenantId { get; init; }
     public required string Email { get; init; }
     public required string Token { get; init; }
+    public string? ReturnUrl { get; init; }
+    public string? ClientId { get; init; }
 }

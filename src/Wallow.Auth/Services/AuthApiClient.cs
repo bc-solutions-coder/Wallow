@@ -161,11 +161,11 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
         }
     }
 
-    public async Task<AuthResponse> SendMagicLinkAsync(string email, CancellationToken ct = default)
+    public async Task<AuthResponse> SendMagicLinkAsync(string email, string? returnUrl = null, string? clientId = null, CancellationToken ct = default)
     {
         HttpClient client = httpClientFactory.CreateClient("AuthApi");
         HttpResponseMessage response = await client.PostAsJsonAsync(
-            $"{BasePath}/passwordless/magic-link", new { Email = email }, ct);
+            $"{BasePath}/passwordless/magic-link", new { Email = email, ReturnUrl = returnUrl, ClientId = clientId }, ct);
 
         if (response.IsSuccessStatusCode)
         {
@@ -183,12 +183,22 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
         HttpResponseMessage response = await client.GetAsync(
             $"{BasePath}/passwordless/magic-link/verify?token={encodedToken}", ct);
 
-        if (response.IsSuccessStatusCode)
+        string content = await response.Content.ReadAsStringAsync(ct);
+
+        if (string.IsNullOrWhiteSpace(content))
         {
-            return new AuthResponse(Succeeded: true);
+            return response.IsSuccessStatusCode
+                ? new AuthResponse(Succeeded: true)
+                : new AuthResponse(Succeeded: false, Error: "unknown_error");
         }
 
-        AuthResponse? body = await response.Content.ReadFromJsonAsync<AuthResponse>(ct);
+        AuthResponse? body = JsonSerializer.Deserialize<AuthResponse>(content, JsonSerializerOptions.Web);
+
+        if (response.IsSuccessStatusCode)
+        {
+            return body ?? new AuthResponse(Succeeded: true);
+        }
+
         return body ?? new AuthResponse(Succeeded: false, Error: "unknown_error");
     }
 
@@ -207,11 +217,11 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
         return body ?? new AuthResponse(Succeeded: false, Error: "unknown_error");
     }
 
-    public async Task<AuthResponse> VerifyOtpAsync(string email, string code, CancellationToken ct = default)
+    public async Task<AuthResponse> VerifyOtpAsync(string email, string code, bool rememberMe = false, CancellationToken ct = default)
     {
         HttpClient client = httpClientFactory.CreateClient("AuthApi");
         HttpResponseMessage response = await client.PostAsJsonAsync(
-            $"{BasePath}/passwordless/otp/verify", new { Email = email, Code = code }, ct);
+            $"{BasePath}/passwordless/otp/verify", new { Email = email, Code = code, RememberMe = rememberMe }, ct);
 
         string content = await response.Content.ReadAsStringAsync(ct);
 

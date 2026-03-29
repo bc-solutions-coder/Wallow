@@ -80,6 +80,144 @@ Branding__Theme__Dark__Primary="oklch(0.65 0.15 250)"
 
 Both `Wallow.Auth` and `Wallow.Web` load `branding.json` at startup and bind it to `BrandingOptions`. The Auth boundary is the canonical owner; the Web boundary has a local copy of the options class. Color tokens are injected as CSS custom properties via the `BrandingTheme.razor` component.
 
+### Session Limits
+
+Wallow enforces a per-user concurrent session limit. When a user exceeds the limit, the oldest active session is automatically evicted before the new one is created.
+
+#### How it works
+
+1. **Session creation** -- on every successful login, `SessionService` counts the user's active, non-revoked, non-expired sessions.
+2. **Eviction** -- if the count is at or above the limit (default: **5**), the oldest session is revoked. A `UserSessionEvictedEvent` is published over the Wolverine bus so other modules can react.
+3. **Redis revocation** -- the evicted (or manually revoked) session token is written to Redis under the key `session:revoked:{token}` with a 24-hour TTL.
+4. **Request-time enforcement** -- `SessionRevocationMiddleware` checks every authenticated request against Redis. If the session token in the `wallow.session` cookie exists in the revoked set, the middleware clears the cookie and returns `401 Unauthorized` with `{"error":"session_revoked"}` before the request reaches any handler.
+5. **Activity tracking** -- `SessionActivityMiddleware` updates the `last_activity_at` timestamp on each session. Updates are throttled to once per 60 seconds per session (via a Redis NX key) to avoid write amplification.
+6. **Pruning** -- `SessionPruningJob` periodically deletes expired and revoked session rows from the database.
+
+#### Session limit
+
+The concurrent session limit is a compile-time constant (`MaxSessions = 5`) in `SessionService`. It applies globally across all users and tenants. To change the limit, update the constant and redeploy.
+
+#### Session management API
+
+Users can inspect and revoke their own sessions via the Identity module API (requires authentication):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/identity/sessions` | List all active sessions for the authenticated user |
+| `DELETE` | `/api/v1/identity/sessions/{sessionId}` | Revoke a specific session by ID |
+
+**List active sessions response:**
+
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "createdAt": "2025-01-15T10:30:00Z",
+    "lastActivityAt": "2025-01-15T14:22:00Z",
+    "expiresAt": "2025-01-16T10:30:00Z"
+  }
+]
+```
+
+**Revoke a session:**
+
+```http
+DELETE /api/v1/identity/sessions/3fa85f64-5717-4562-b3fc-2c963f66afa6
+Authorization: Bearer {token}
+```
+
+Returns `204 No Content` on success. A session can only be revoked by its owner -- attempting to revoke another user's session returns an error.
+
+#### Redis requirements
+
+Session revocation requires a working Redis connection. Configure `ConnectionStrings__Redis` (see [Connection Strings](#connection-strings) below).
+
+Revoked and evicted session tokens are stored with a 24-hour TTL. Redis keys use these patterns:
+
+```
+session:revoked:{token}   -- value "revoked" (manual) or "evicted" (auto-evicted)
+session:touched:{token}   -- NX key throttling activity updates (60s TTL)
+```
+
+If Redis is unreachable, `SessionRevocationMiddleware` will fail to check revocation, so revoked sessions may temporarily pass through. Ensure Redis availability matches your security requirements.
+
+#### Session duration
+
+Sessions expire 24 hours after creation. The `SessionPruningJob` removes expired and revoked rows from the database on a periodic schedule.
+
+### Identity: Email Change Flow
+
+Wallow includes a secure two-step email change flow. Users request a change via the API, receive a confirmation link at the new address, and click it to finalize.
+
+#### Endpoints
+
+**Initiate email change** -- authenticated users only:
+
+```http
+POST /api/v1/identity/auth/change-email
+Authorization: Cookie (authenticated session)
+Content-Type: application/json
+
+{
+  "newEmail": "newaddress@example.com"
+}
+```
+
+Responses:
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| `200 OK` | `{ "succeeded": true }` | Confirmation email sent to the new address |
+| `400 Bad Request` | `{ "succeeded": false, "error": "same_email" }` | New email matches the current email |
+| `429 Too Many Requests` | `{ "succeeded": false, "error": "rate_limited" }` | Rate limit exceeded (max 3 per hour) |
+| `401 Unauthorized` | `{ "succeeded": false, "error": "unauthorized" }` | Not authenticated |
+
+**Confirm email change** -- unauthenticated, accessed via the link in the confirmation email:
+
+```http
+GET /api/v1/identity/auth/confirm-email-change
+  ?token=<change-token>
+  &userId=<user-id>
+  &newEmail=<new-email>
+```
+
+Responses:
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| `200 OK` | `{ "succeeded": true }` | Email changed successfully |
+| `400 Bad Request` | `{ "succeeded": false, "error": "token_expired" }` | Confirmation link expired (24-hour window) |
+| `400 Bad Request` | `{ "succeeded": false, "error": "invalid_token" }` | Token invalid or already used |
+
+#### Security Model
+
+- **Token expiry**: Confirmation tokens are valid for **24 hours** from the time of the request. Expired tokens are rejected and the pending change is cleared automatically.
+- **Rate limiting**: A maximum of **3 email change requests per hour** per user is enforced server-side via Redis. Requests beyond this limit return `429 Too Many Requests`.
+- **Confirmation email goes to the new address**: A `UserEmailChangeRequestedEvent` is published, which the Notifications module handles to send a confirmation email to the new address.
+- **Notification on completion**: When a change is confirmed, a `UserEmailChangedEvent` is published. The Notifications module handles this to send a security notice to the **old address**, alerting the account holder that their email was changed.
+- **Username sync**: On confirmation, the user's username is updated to match the new email address.
+- **Session continuity**: Existing sessions remain valid after an email change. If your fork requires forced re-authentication on email change, add a Wolverine handler for `UserEmailChangedEvent` that revokes the user's active sessions.
+
+#### Integration with Email Verification Infrastructure
+
+The email change flow uses the same ASP.NET Core Identity token infrastructure as initial email verification (`GenerateChangeEmailTokenAsync` / `ChangeEmailAsync`). Token generation and validation are handled entirely within the Identity module's `UserManager`.
+
+The confirmation URL is constructed using the `AuthUrl` configuration key:
+
+```json
+{
+  "AuthUrl": "https://auth.yourdomain.com"
+}
+```
+
+The `Wallow.Auth` app must serve the `/confirm-email-change` route. This page reads the `token`, `userId`, and `newEmail` query parameters and calls the confirm endpoint on the API to finalize the change.
+
+| Config Key | Required | Description |
+|------------|----------|-------------|
+| `AuthUrl` | Yes | Base URL of the `Wallow.Auth` app. Used to build the confirmation link sent to the user. |
+
+---
+
 ### Connection Strings
 
 ```json

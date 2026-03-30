@@ -233,10 +233,10 @@ jobs:
             -c Release --no-build /t:PublishContainer \
             -p:ContainerImageTag=test-amd64
 
-          # arm64 images (API must rebuild to cross-compile migration bundles;
-          # Auth and Web are pure IL so --no-build still works)
+          # arm64 images (IL is arch-agnostic; ContainerRuntimeIdentifier picks the base image;
+          # migration bundle cross-compilation is handled inside the MSBuild target)
           dotnet publish src/Wallow.Api/Wallow.Api.csproj \
-            -c Release /t:PublishContainer \
+            -c Release --no-build /t:PublishContainer \
             -p:ContainerImageTag=test-arm64 \
             -p:ContainerRuntimeIdentifier=linux-arm64 \
             -p:BuildMigrationBundles=true

@@ -59,6 +59,20 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddBlazorBlueprintComponents();
 
+// On non-HTTPS (local dev), downgrade SameSite=None → Unspecified so the browser defaults to
+// Lax instead of rejecting the cookie (browsers require Secure with SameSite=None).
+builder.Services.Configure<CookiePolicyOptions>(options =>
+{
+    options.OnAppendCookie = context =>
+    {
+        if (context.CookieOptions.SameSite == SameSiteMode.None && !context.Context.Request.IsHttps)
+        {
+            context.CookieOptions.SameSite = SameSiteMode.Unspecified;
+            context.CookieOptions.Secure = false;
+        }
+    };
+});
+
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -71,15 +85,11 @@ builder.Services.AddAuthentication(options =>
     })
     .AddOpenIdConnect(options =>
     {
-        // OIDC uses response_mode=form_post, which means the authorization server sends a POST back
-        // to the callback URL. SameSite=Lax blocks cookies on cross-origin POSTs (even same-site),
-        // so use None for the correlation/nonce cookies. Chromium allows SameSite=None without Secure
-        // on localhost, and production should use HTTPS where Secure is naturally satisfied.
-        // OIDC uses response_mode=form_post, which means the authorization server sends a POST back
-        // to the callback URL. SameSite=Lax blocks cookies on cross-origin POSTs (even same-site),
-        // so use None + Secure for the correlation/nonce cookies. Browsers treat localhost as a
-        // secure context, so Secure cookies work over HTTP on localhost. In production, HTTPS
-        // satisfies the Secure requirement naturally.
+        // OIDC uses response_mode=form_post: the auth server POSTs back to the callback URL.
+        // In production (HTTPS, separate domains), this is a cross-site POST requiring
+        // SameSite=None + Secure. On localhost HTTP, browsers reject that combination, so
+        // CookiePolicyMiddleware (below) downgrades None → Unspecified on non-HTTPS requests,
+        // letting the browser default to Lax (which works for same-site localhost).
         options.CorrelationCookie.SameSite = SameSiteMode.None;
         options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
         options.NonceCookie.SameSite = SameSiteMode.None;
@@ -227,6 +237,7 @@ app.Use(async (context, next) =>
 });
 
 app.UseStaticFiles();
+app.UseCookiePolicy();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<TokenCaptureMiddleware>();

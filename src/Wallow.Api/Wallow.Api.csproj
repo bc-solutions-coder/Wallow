@@ -14,6 +14,7 @@
   <PropertyGroup>
     <ContainerRepository>wallow-api</ContainerRepository>
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:10.0</ContainerBaseImage>
+    <ContainerRuntimeIdentifiers>linux-x64;linux-arm64</ContainerRuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>

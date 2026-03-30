@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/piggy-icon.svg?v=2" alt="Wallow" width="120" />
+<img src="assets/piggy-icon.svg" alt="Wallow" width="120" />
 
 # Wallow
 

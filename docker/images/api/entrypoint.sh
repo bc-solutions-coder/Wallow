@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+# Self-contained bundles need a writable dir to extract embedded files.
+# /tmp is a tmpfs mount in read-only containers.
+export DOTNET_BUNDLE_EXTRACT_BASE_DIR="${DOTNET_BUNDLE_EXTRACT_BASE_DIR:-/tmp/dotnet-bundle}"
+
 BUNDLE_DIR="${BUNDLE_DIR:-/app/bundles}"
 
 # -------------------------------------------------------

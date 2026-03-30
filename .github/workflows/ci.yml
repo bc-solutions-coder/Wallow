@@ -449,6 +449,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up QEMU for multi-arch builds
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -485,18 +488,19 @@ jobs:
             echo "Pushed multi-arch ${remote}:latest and ${remote}:${SHORT_SHA}"
           done
 
-          # Infra images — single-arch, push as-is
-          docker tag wallow-garage:test "${IMAGE_BASE}-garage:latest"
-          docker tag wallow-garage:test "${IMAGE_BASE}-garage:${SHORT_SHA}"
-          docker push "${IMAGE_BASE}-garage:latest"
-          docker push "${IMAGE_BASE}-garage:${SHORT_SHA}"
-          echo "Pushed ${IMAGE_BASE}-garage:latest and ${IMAGE_BASE}-garage:${SHORT_SHA}"
+          # Infra images — multi-arch build + push directly via buildx
+          # (cached images are amd64-only for E2E; rebuild here for both arches)
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --tag "${IMAGE_BASE}-garage:latest" \
+            --tag "${IMAGE_BASE}-garage:${SHORT_SHA}" \
+            --push docker/images/garage
 
-          docker tag wallow-postgres-replica:latest "${IMAGE_BASE}-postgres-replica:latest"
-          docker tag wallow-postgres-replica:latest "${IMAGE_BASE}-postgres-replica:${SHORT_SHA}"
-          docker push "${IMAGE_BASE}-postgres-replica:latest"
-          docker push "${IMAGE_BASE}-postgres-replica:${SHORT_SHA}"
-          echo "Pushed ${IMAGE_BASE}-postgres-replica:latest and ${IMAGE_BASE}-postgres-replica:${SHORT_SHA}"
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --tag "${IMAGE_BASE}-postgres-replica:latest" \
+            --tag "${IMAGE_BASE}-postgres-replica:${SHORT_SHA}" \
+            --push docker/images/postgres-replica
+
+          echo "Pushed multi-arch infra images (garage, postgres-replica)"
 
   merge-coverage:
     needs: [unit-tests, integration-tests]

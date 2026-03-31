@@ -3,10 +3,10 @@
 # =============================================================================
 # Fully self-contained — runs locally or on a server with the same command.
 # Reverse proxy handles TLS + path-based routing externally:
-#   wallow.dev/api  -> wallow-api:8080   (strip /api prefix)
-#   wallow.dev/auth -> wallow-auth:8080  (strip /auth prefix)
-#   wallow.dev      -> wallow-web:8080
-# Containers expose HTTP only.
+#   wallow.dev/api/*  -> wallow-api:8080   (forward full path, app uses PathBase=/api)
+#   wallow.dev/auth/* -> wallow-auth:8080  (forward full path, app uses PathBase=/auth)
+#   wallow.dev/*      -> wallow-web:8080
+# Containers expose HTTP only. Do NOT strip path prefixes in the proxy.
 #
 # Usage:
 #   cd docker
@@ -231,6 +231,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+      # PathBase for reverse-proxy path-based routing
+      PathBase: ${API_PATH_BASE:-/api}
       # OpenIddict certificates (auto-generated on first startup if missing)
       OpenIddict__SigningCertPath: /app/certs/signing.pfx
       OpenIddict__SigningCertPassword: ${OPENIDDICT_SIGNING_CERT_PASSWORD}
@@ -383,6 +385,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+      # PathBase for reverse-proxy path-based routing
+      PathBase: ${AUTH_PATH_BASE:-/auth}
       # Public URL for browser redirects (exchange-ticket, external-login, etc.)
       ApiBaseUrl: ${API_PUBLIC_URL:-https://wallow.dev/api}
       # Internal URL for server-to-server calls (container-to-container)

@@ -39,16 +39,19 @@
             <div class="flex border-b border-border mb-4">
                 <button type="button"
                         class="@TabClass(LoginTab.Password)"
+                        data-testid="login-tab-password"
                         @onclick="() => SwitchTab(LoginTab.Password)">
                     Password
                 </button>
                 <button type="button"
                         class="@TabClass(LoginTab.MagicLink)"
+                        data-testid="login-tab-magic-link"
                         @onclick="() => SwitchTab(LoginTab.MagicLink)">
                     Magic Link
                 </button>
                 <button type="button"
                         class="@TabClass(LoginTab.Otp)"
+                        data-testid="login-tab-otp"
                         @onclick="() => SwitchTab(LoginTab.Otp)">
                     OTP
                 </button>
@@ -102,9 +105,11 @@
             {
                 @if (_magicLinkSent)
                 {
-                    <BbAlert Variant="AlertVariant.Success">
-                        <BbAlertDescription>Check your email for a magic link.</BbAlertDescription>
-                    </BbAlert>
+                    <div data-testid="login-magic-link-sent">
+                        <BbAlert Variant="AlertVariant.Success">
+                            <BbAlertDescription>Check your email for a magic link.</BbAlertDescription>
+                        </BbAlert>
+                    </div>
                 }
                 else
                 {
@@ -115,13 +120,15 @@
                                 <BbInput Id="magicLinkEmail"
                                          Type="InputType.Email"
                                          Placeholder="name@example.com"
+                                         data-testid="login-magic-link-email"
                                          @bind-Value="_email" />
                             </div>
 
                             <BbButton Class="w-full"
                                       Type="ButtonType.Submit"
                                       Loading="_isSubmitting"
-                                      Disabled="_isSubmitting">
+                                      Disabled="_isSubmitting"
+                                      data-testid="login-magic-link-submit">
                                 Send link
                             </BbButton>
                         </div>
@@ -133,19 +140,21 @@
                 @if (_otpSent)
                 {
                     <form @onsubmit="HandleVerifyOtp" @onsubmit:preventDefault>
-                        <div class="space-y-4">
+                        <div class="space-y-4" data-testid="login-otp-sent">
                             <div class="space-y-2">
                                 <BbLabel For="otpCode">Enter the 6-digit code sent to your email</BbLabel>
                                 <BbInput Id="otpCode"
                                          Type="InputType.Text"
                                          Placeholder="000000"
+                                         data-testid="login-otp-code"
                                          @bind-Value="_otpCode" />
                             </div>
 
                             <BbButton Class="w-full"
                                       Type="ButtonType.Submit"
                                       Loading="_isSubmitting"
-                                      Disabled="_isSubmitting">
+                                      Disabled="_isSubmitting"
+                                      data-testid="login-otp-verify-submit">
                                 Verify code
                             </BbButton>
                         </div>
@@ -160,13 +169,15 @@
                                 <BbInput Id="otpEmail"
                                          Type="InputType.Email"
                                          Placeholder="name@example.com"
+                                         data-testid="login-otp-email"
                                          @bind-Value="_email" />
                             </div>
 
                             <BbButton Class="w-full"
                                       Type="ButtonType.Submit"
                                       Loading="_isSubmitting"
-                                      Disabled="_isSubmitting">
+                                      Disabled="_isSubmitting"
+                                      data-testid="login-otp-send-submit">
                                 Send code
                             </BbButton>
                         </div>
@@ -217,6 +228,9 @@
     [SupplyParameterFromQuery]
     public string? Error { get; set; }
 
+    [SupplyParameterFromQuery(Name = "magicLinkToken")]
+    public string? MagicLinkToken { get; set; }
+
     private LoginTab _activeTab = LoginTab.Password;
     private string _email = string.Empty;
     private string _password = string.Empty;
@@ -234,6 +248,12 @@
     protected override async Task OnInitializedAsync()
     {
         _externalProviders = await AuthClient.GetExternalProvidersAsync();
+
+        if (!string.IsNullOrEmpty(MagicLinkToken))
+        {
+            await HandleVerifyMagicLink();
+        }
+
         await base.OnInitializedAsync();
     }
 
@@ -350,7 +370,7 @@
                 return;
             }
 
-            AuthResponse result = await AuthClient.SendMagicLinkAsync(_email);
+            AuthResponse result = await AuthClient.SendMagicLinkAsync(_email, ReturnUrl, ClientId);
 
             if (result.Succeeded)
             {
@@ -358,11 +378,7 @@
             }
             else
             {
-                _errorMessage = result.Error switch
-                {
-                    "user_not_found" => "No account found with that email.",
-                    _ => "An error occurred. Please try again."
-                };
+                _errorMessage = "An error occurred. Please try again.";
             }
         }
         catch (HttpRequestException)
@@ -372,6 +388,34 @@
         finally
         {
             _isSubmitting = false;
+        }
+    }
+
+    private async Task HandleVerifyMagicLink()
+    {
+        _errorMessage = null;
+        _activeTab = LoginTab.MagicLink;
+
+        try
+        {
+            AuthResponse result = await AuthClient.VerifyMagicLinkAsync(MagicLinkToken!);
+
+            if (result.Succeeded)
+            {
+                HandleSuccessfulAuth(result);
+            }
+            else
+            {
+                _errorMessage = result.Error switch
+                {
+                    "invalid_token" or "Token expired or already used." => "This magic link has expired or has already been used. Please request a new one.",
+                    _ => "An error occurred verifying the magic link. Please try again."
+                };
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "Unable to reach the server. Please try again later.";
         }
     }
 
@@ -396,11 +440,7 @@
             }
             else
             {
-                _errorMessage = result.Error switch
-                {
-                    "user_not_found" => "No account found with that email.",
-                    _ => "An error occurred. Please try again."
-                };
+                _errorMessage = "An error occurred. Please try again.";
             }
         }
         catch (HttpRequestException)
@@ -426,7 +466,7 @@
                 return;
             }
 
-            AuthResponse result = await AuthClient.VerifyOtpAsync(_email, _otpCode);
+            AuthResponse result = await AuthClient.VerifyOtpAsync(_email, _otpCode, _rememberMe);
 
             if (result.Succeeded)
             {

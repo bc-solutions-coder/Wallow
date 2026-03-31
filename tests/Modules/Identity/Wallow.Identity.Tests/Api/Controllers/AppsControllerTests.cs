@@ -201,4 +201,143 @@ public class AppsControllerTests
     }
 
     #endregion
+
+    #region GetConsentInfo
+
+    [Fact]
+    public async Task GetConsentInfo_WithKnownClientId_Returns200WithDisplayNameAndScopes()
+    {
+        // Arrange
+        ConsentInfoDto dto = new(
+            "third-party-app",
+            "My Third Party App",
+            "https://example.com/logo.png",
+            [new ConsentScopeDto("inquiries.read", "Read inquiries"), new ConsentScopeDto("storage.read", "Read storage")]);
+        _developerAppService.GetConsentInfoAsync(
+                "third-party-app",
+                Arg.Any<IReadOnlyCollection<string>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(dto);
+
+        // Act
+        ActionResult<ConsentInfoResponse> result = await _controller.GetConsentInfo(
+            "third-party-app", "inquiries.read storage.read", CancellationToken.None);
+
+        // Assert
+        OkObjectResult ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        ConsentInfoResponse response = ok.Value.Should().BeOfType<ConsentInfoResponse>().Subject;
+        response.ClientId.Should().Be("third-party-app");
+        response.DisplayName.Should().Be("My Third Party App");
+        response.LogoUrl.Should().Be("https://example.com/logo.png");
+        response.RequestedScopes.Should().HaveCount(2);
+        response.RequestedScopes[0].Name.Should().Be("inquiries.read");
+        response.RequestedScopes[0].Description.Should().Be("Read inquiries");
+        response.RequestedScopes[1].Name.Should().Be("storage.read");
+        response.RequestedScopes[1].Description.Should().Be("Read storage");
+    }
+
+    [Fact]
+    public async Task GetConsentInfo_WithKnownClientIdAndEmptyScopes_Returns200WithEmptyScopesList()
+    {
+        // Arrange
+        ConsentInfoDto dto = new(
+            "third-party-app",
+            "My Third Party App",
+            null,
+            []);
+        _developerAppService.GetConsentInfoAsync(
+                "third-party-app",
+                Arg.Any<IReadOnlyCollection<string>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(dto);
+
+        // Act
+        ActionResult<ConsentInfoResponse> result = await _controller.GetConsentInfo(
+            "third-party-app", null, CancellationToken.None);
+
+        // Assert
+        OkObjectResult ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        ConsentInfoResponse response = ok.Value.Should().BeOfType<ConsentInfoResponse>().Subject;
+        response.ClientId.Should().Be("third-party-app");
+        response.DisplayName.Should().Be("My Third Party App");
+        response.LogoUrl.Should().BeNull();
+        response.RequestedScopes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetConsentInfo_WithUnknownClientId_Returns404()
+    {
+        // Arrange
+        _developerAppService.GetConsentInfoAsync(
+                "unknown-client",
+                Arg.Any<IReadOnlyCollection<string>>(),
+                Arg.Any<CancellationToken>())
+            .Returns((ConsentInfoDto?)null);
+
+        // Act
+        ActionResult<ConsentInfoResponse> result = await _controller.GetConsentInfo(
+            "unknown-client", null, CancellationToken.None);
+
+        // Assert
+        result.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task GetConsentInfo_WithFirstPartyWallowClient_StillReturnsInfo()
+    {
+        // Arrange - first-party clients (wallow-*) should still return info from this endpoint;
+        // filtering is enforced by AuthorizationController, not here
+        ConsentInfoDto dto = new(
+            "wallow-web",
+            "Wallow Web App",
+            null,
+            [new ConsentScopeDto("openid", "OpenID Connect")]);
+        _developerAppService.GetConsentInfoAsync(
+                "wallow-web",
+                Arg.Any<IReadOnlyCollection<string>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(dto);
+
+        // Act
+        ActionResult<ConsentInfoResponse> result = await _controller.GetConsentInfo(
+            "wallow-web", "openid", CancellationToken.None);
+
+        // Assert
+        OkObjectResult ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        ConsentInfoResponse response = ok.Value.Should().BeOfType<ConsentInfoResponse>().Subject;
+        response.ClientId.Should().Be("wallow-web");
+        response.DisplayName.Should().Be("Wallow Web App");
+    }
+
+    [Fact]
+    public async Task GetConsentInfo_MapsServiceDtoToResponseCorrectly()
+    {
+        // Arrange
+        ConsentInfoDto dto = new(
+            "app-mapped",
+            "Mapped App",
+            "https://cdn.example.com/icon.svg",
+            [new ConsentScopeDto("messaging.write", "Send messages")]);
+        _developerAppService.GetConsentInfoAsync(
+                "app-mapped",
+                Arg.Any<IReadOnlyCollection<string>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(dto);
+
+        // Act
+        ActionResult<ConsentInfoResponse> result = await _controller.GetConsentInfo(
+            "app-mapped", "messaging.write", CancellationToken.None);
+
+        // Assert
+        OkObjectResult ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        ConsentInfoResponse response = ok.Value.Should().BeOfType<ConsentInfoResponse>().Subject;
+        response.ClientId.Should().Be(dto.ClientId);
+        response.DisplayName.Should().Be(dto.DisplayName);
+        response.LogoUrl.Should().Be(dto.LogoUrl);
+        response.RequestedScopes.Should().HaveCount(1);
+        response.RequestedScopes[0].Name.Should().Be(dto.RequestedScopes[0].Name);
+        response.RequestedScopes[0].Description.Should().Be(dto.RequestedScopes[0].Description);
+    }
+
+    #endregion
 }

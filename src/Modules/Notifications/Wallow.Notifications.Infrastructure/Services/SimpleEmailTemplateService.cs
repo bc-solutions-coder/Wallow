@@ -237,6 +237,47 @@ public sealed partial class SimpleEmailTemplateService(
                 "Verify Identity",
                 "{{VerificationUrl}}"),
 
+            "invitation" => WrapInLayout(
+                "You've Been Invited",
+                """
+                <tr>
+                    <td style="padding: 30px 40px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.6; color: #333333;">
+                        <p style="margin: 0 0 16px;">You've been invited to join an organization on {{AppName}}.</p>
+                        <p style="margin: 0 0 16px;">Click the button below to view and accept the invitation.</p>
+                        <p style="margin: 0 0 24px;">This invitation will expire on {{ExpiresAt}}.</p>
+                    </td>
+                </tr>
+                """,
+                "View Invitation",
+                "{{InvitationUrl}}"),
+
+            "magiclink" => WrapInLayout(
+                "Your Magic Link",
+                """
+                <tr>
+                    <td style="padding: 30px 40px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.6; color: #333333;">
+                        <p style="margin: 0 0 16px;">You requested a magic link to sign in to your {{AppName}} account (<strong>{{Email}}</strong>).</p>
+                        <p style="margin: 0 0 16px;">Click the button below to sign in. This link will expire shortly.</p>
+                        <p style="margin: 0 0 24px;">If you did not request this, you can safely ignore this email.</p>
+                    </td>
+                </tr>
+                """,
+                "Sign In",
+                "{{VerifyUrl}}"),
+
+            "otpcode" => WrapInLayout(
+                "Your Login Code",
+                """
+                <tr>
+                    <td style="padding: 30px 40px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.6; color: #333333;">
+                        <p style="margin: 0 0 16px;">You requested a one-time code to sign in to your {{AppName}} account (<strong>{{Email}}</strong>).</p>
+                        <p style="margin: 0 0 16px;">Your verification code is:</p>
+                        <p style="margin: 0 0 16px; font-size: 32px; font-weight: bold; text-align: center; letter-spacing: 8px;">{{Code}}</p>
+                        <p style="margin: 0 0 24px;">This code will expire shortly. If you did not request this, you can safely ignore this email.</p>
+                    </td>
+                </tr>
+                """),
+
             _ => WrapInLayout(
                 "Notification",
                 """

@@ -4,7 +4,7 @@ namespace Wallow.Identity.Application.Interfaces;
 
 public interface IPasswordlessService
 {
-    Task<PasswordlessResult> SendMagicLinkAsync(string email, CancellationToken ct);
+    Task<PasswordlessResult> SendMagicLinkAsync(string email, CancellationToken ct, string? returnUrl = null, string? clientId = null);
 
     Task<PasswordlessResult> ValidateMagicLinkAsync(string token, CancellationToken ct);
 

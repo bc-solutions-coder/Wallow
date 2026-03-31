@@ -119,4 +119,32 @@ public class AppsController(IDeveloperAppService developerAppService) : Controll
 
         return Ok(response);
     }
+
+    [HttpGet("consent-info/{clientId}")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ConsentInfoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ConsentInfoResponse>> GetConsentInfo(
+        string clientId,
+        [FromQuery] string? scopes,
+        CancellationToken ct)
+    {
+        IReadOnlyList<string> scopeList = string.IsNullOrWhiteSpace(scopes)
+            ? []
+            : scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        ConsentInfoDto? dto = await developerAppService.GetConsentInfoAsync(clientId, scopeList, ct);
+        if (dto is null)
+        {
+            return NotFound();
+        }
+
+        ConsentInfoResponse response = new(
+            dto.ClientId,
+            dto.DisplayName,
+            dto.LogoUrl,
+            dto.RequestedScopes.Select(s => new ScopeInfo(s.Name, s.Description)).ToList());
+
+        return Ok(response);
+    }
 }

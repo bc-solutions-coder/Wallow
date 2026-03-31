@@ -1,0 +1,65 @@
+@page "/consent"
+@rendermode InteractiveServer
+
+@inject IAuthApiClient AuthClient
+@inject NavigationManager Navigation
+
+<PageTitle>Consent</PageTitle>
+
+@if (_consentInfo is null)
+{
+    <div data-testid="consent-error">
+        <p>Unable to load consent information. Please try again.</p>
+    </div>
+}
+else
+{
+    <div>
+        <h2 data-testid="consent-heading">@_consentInfo.DisplayName is requesting access</h2>
+        <div data-testid="consent-scopes">
+            @foreach (ConsentScopeInfo scope in _consentInfo.RequestedScopes)
+            {
+                <div>@scope.Name</div>
+            }
+        </div>
+        <button data-testid="consent-approve" @onclick="Approve">Approve</button>
+        <button data-testid="consent-deny" @onclick="Deny">Deny</button>
+    </div>
+}
+
+@code {
+    private ConsentInfo? _consentInfo;
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ClientId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ClientId is not null)
+        {
+            _consentInfo = await AuthClient.GetConsentInfoAsync(ClientId, Array.Empty<string>());
+        }
+    }
+
+    private void Approve()
+    {
+        string url = AppendToReturnUrl("consent_granted=true");
+        Navigation.NavigateTo(url, forceLoad: true);
+    }
+
+    private void Deny()
+    {
+        string url = AppendToReturnUrl("consent_denied=true");
+        Navigation.NavigateTo(url, forceLoad: true);
+    }
+
+    private string AppendToReturnUrl(string parameter)
+    {
+        string baseUrl = ReturnUrl ?? "/";
+        string separator = baseUrl.Contains('?') ? "&" : "?";
+        return baseUrl + separator + parameter;
+    }
+}

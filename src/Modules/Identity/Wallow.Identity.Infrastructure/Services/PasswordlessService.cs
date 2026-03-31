@@ -51,7 +51,7 @@ public sealed partial class PasswordlessService : IPasswordlessService
         _hmacKey = protector.Protect(Encoding.UTF8.GetBytes(ProtectorPurpose));
     }
 
-    public async Task<PasswordlessResult> SendMagicLinkAsync(string email, CancellationToken ct)
+    public async Task<PasswordlessResult> SendMagicLinkAsync(string email, CancellationToken ct, string? returnUrl = null, string? clientId = null)
     {
         if (!await IsWithinRateLimitAsync(email))
         {
@@ -79,7 +79,9 @@ public sealed partial class PasswordlessService : IPasswordlessService
             UserId = user.Id,
             TenantId = _tenantContext.TenantId.Value,
             Email = email,
-            Token = signedToken
+            Token = signedToken,
+            ReturnUrl = returnUrl,
+            ClientId = clientId
         });
 
         LogMagicLinkSent(email);

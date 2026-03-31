@@ -64,6 +64,7 @@ public sealed class AuthorizationController(
 
         string? clientId = await applicationManager.GetClientIdAsync(application);
         bool isFirstParty = clientId?.StartsWith(FirstPartyClientPrefix, StringComparison.OrdinalIgnoreCase) is true;
+        bool hasValidAuthorization = false;
 
         if (!isFirstParty)
         {
@@ -71,7 +72,6 @@ public sealed class AuthorizationController(
             string applicationId = (await applicationManager.GetIdAsync(application))!;
 
             // Check for an existing valid authorization for this user+client+scopes combination
-            bool hasValidAuthorization = false;
             await foreach (object authorization in authorizationManager.FindBySubjectAsync(userId))
             {
                 string? authAppId = await authorizationManager.GetApplicationIdAsync(authorization);
@@ -92,6 +92,42 @@ public sealed class AuthorizationController(
                     hasValidAuthorization = true;
                     break;
                 }
+            }
+
+            // Handle consent denial — must be checked before consent grant
+            if (string.Equals(request["consent_denied"]?.ToString(), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new Microsoft.AspNetCore.Authentication.AuthenticationProperties(
+                        new Dictionary<string, string?>
+                        {
+                            [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.ConsentRequired,
+                            [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
+                                "The user denied the consent request."
+                        }));
+            }
+
+            // Handle consent grant — create a permanent authorization if none exists
+            if (string.Equals(request["consent_granted"]?.ToString(), "true", StringComparison.OrdinalIgnoreCase)
+                && !hasValidAuthorization)
+            {
+                OpenIddictAuthorizationDescriptor descriptor = new()
+                {
+                    ApplicationId = applicationId,
+                    CreationDate = DateTimeOffset.UtcNow,
+                    Status = Statuses.Valid,
+                    Subject = userId,
+                    Type = AuthorizationTypes.Permanent
+                };
+
+                foreach (string scope in requestedScopes)
+                {
+                    descriptor.Scopes.Add(scope);
+                }
+
+                await authorizationManager.CreateAsync(descriptor);
+                hasValidAuthorization = true;
             }
 
             if (!hasValidAuthorization)
@@ -126,7 +162,7 @@ public sealed class AuthorizationController(
 
         ClaimsIdentity identity = await BuildClaimsIdentityAsync(user, userId, request, tenantInfo);
 
-        if (!isFirstParty)
+        if (!isFirstParty && !hasValidAuthorization)
         {
             // Store a permanent authorization so consent is not re-prompted
             string applicationId = (await applicationManager.GetIdAsync(application))!;

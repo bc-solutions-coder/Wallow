@@ -416,4 +416,51 @@ public sealed class AuthApiClientTests : IDisposable
 
         result.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task GetConsentInfoAsync_Success_ReturnsPopulatedConsentInfo()
+    {
+        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/api/v1/identity/apps/consent-info/my-client*")
+            .Respond("application/json",
+                """{"clientId":"my-client","displayName":"My App","logoUrl":"https://example.com/logo.png","requestedScopes":[{"name":"openid","description":"OpenID"},{"name":"profile","description":"Profile info"}]}""");
+
+        ConsentInfo? result = await _sut.GetConsentInfoAsync("my-client", ["openid", "profile"]);
+
+        result.Should().NotBeNull();
+        result!.ClientId.Should().Be("my-client");
+        result.DisplayName.Should().Be("My App");
+        result.LogoUrl.Should().Be("https://example.com/logo.png");
+        result.RequestedScopes.Should().HaveCount(2);
+        result.RequestedScopes[0].Name.Should().Be("openid");
+        result.RequestedScopes[0].Description.Should().Be("OpenID");
+        result.RequestedScopes[1].Name.Should().Be("profile");
+        result.RequestedScopes[1].Description.Should().Be("Profile info");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData(HttpStatusCode.BadRequest)]
+    public async Task GetConsentInfoAsync_NonSuccessStatus_ReturnsNull(HttpStatusCode statusCode)
+    {
+        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/api/v1/identity/apps/consent-info/unknown-client*")
+            .Respond(statusCode);
+
+        ConsentInfo? result = await _sut.GetConsentInfoAsync("unknown-client", ["openid"]);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetConsentInfoAsync_SpecialCharactersInClientId_ArePercentEncoded()
+    {
+        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/api/v1/identity/apps/consent-info/my%20client%26co*")
+            .Respond("application/json",
+                """{"clientId":"my client&co","displayName":null,"logoUrl":null,"requestedScopes":[]}""");
+
+        ConsentInfo? result = await _sut.GetConsentInfoAsync("my client&co", []);
+
+        result.Should().NotBeNull();
+        result!.ClientId.Should().Be("my client&co");
+    }
 }

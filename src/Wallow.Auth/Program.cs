@@ -107,6 +107,13 @@ builder.Services.AddHealthChecks()
 
 WebApplication app = builder.Build();
 
+// Opt-in PathBase for reverse-proxy path-based routing (e.g. /auth)
+string? pathBase = app.Configuration["PathBase"];
+if (!string.IsNullOrEmpty(pathBase))
+{
+    app.UsePathBase(pathBase);
+}
+
 if (!app.Environment.IsDevelopment())
 {
     ForwardedHeadersOptions forwardedHeadersOptions = new()

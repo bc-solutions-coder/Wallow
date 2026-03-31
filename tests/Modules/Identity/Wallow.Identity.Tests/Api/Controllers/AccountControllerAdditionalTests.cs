@@ -844,7 +844,7 @@ public class AccountControllerAdditionalTests
     [Fact]
     public async Task SendMagicLink_Failure_ReturnsBadRequest()
     {
-        _passwordlessService.SendMagicLinkAsync("test@test.com", Arg.Any<CancellationToken>())
+        _passwordlessService.SendMagicLinkAsync("test@test.com", Arg.Any<CancellationToken>(), Arg.Any<string?>(), Arg.Any<string?>())
             .Returns(new PasswordlessResult(false, null, "user_not_found"));
 
         IActionResult result = await _controller.SendMagicLink(
@@ -858,7 +858,7 @@ public class AccountControllerAdditionalTests
     [Fact]
     public async Task SendMagicLink_Success_ReturnsOk()
     {
-        _passwordlessService.SendMagicLinkAsync("test@test.com", Arg.Any<CancellationToken>())
+        _passwordlessService.SendMagicLinkAsync("test@test.com", Arg.Any<CancellationToken>(), Arg.Any<string?>(), Arg.Any<string?>())
             .Returns(new PasswordlessResult(true, "test@test.com", null));
 
         IActionResult result = await _controller.SendMagicLink(
@@ -879,7 +879,7 @@ public class AccountControllerAdditionalTests
         _passwordlessService.ValidateMagicLinkAsync("invalid-token", Arg.Any<CancellationToken>())
             .Returns(new PasswordlessResult(false, null, "invalid_or_expired_token"));
 
-        IActionResult result = await _controller.VerifyMagicLink("invalid-token", CancellationToken.None);
+        IActionResult result = await _controller.VerifyMagicLink("invalid-token", false, CancellationToken.None);
 
         UnauthorizedObjectResult unauthorized = result.Should().BeOfType<UnauthorizedObjectResult>().Subject;
         string json = System.Text.Json.JsonSerializer.Serialize(unauthorized.Value);
@@ -892,7 +892,7 @@ public class AccountControllerAdditionalTests
         _passwordlessService.ValidateMagicLinkAsync("valid-token", Arg.Any<CancellationToken>())
             .Returns(new PasswordlessResult(true, "test@test.com", null));
 
-        IActionResult result = await _controller.VerifyMagicLink("valid-token", CancellationToken.None);
+        IActionResult result = await _controller.VerifyMagicLink("valid-token", false, CancellationToken.None);
 
         OkObjectResult ok = result.Should().BeOfType<OkObjectResult>().Subject;
         string json = System.Text.Json.JsonSerializer.Serialize(ok.Value);

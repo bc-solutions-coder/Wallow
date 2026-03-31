@@ -21,4 +21,9 @@ public interface IDeveloperAppService
         string userId,
         string clientId,
         CancellationToken cancellationToken = default);
+
+    Task<ConsentInfoDto?> GetConsentInfoAsync(
+        string clientId,
+        IReadOnlyCollection<string> requestedScopes,
+        CancellationToken cancellationToken = default);
 }

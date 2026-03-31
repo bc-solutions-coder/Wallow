@@ -10,6 +10,7 @@ namespace Wallow.Identity.Infrastructure.Services;
 
 public sealed partial class OpenIddictDeveloperAppService(
     IOpenIddictApplicationManager applicationManager,
+    IOpenIddictScopeManager scopeManager,
     ILogger<OpenIddictDeveloperAppService> logger) : IDeveloperAppService
 {
     public async Task<DeveloperAppRegistrationResult> RegisterClientAsync(
@@ -144,6 +145,41 @@ public sealed partial class OpenIddictDeveloperAppService(
             descriptor.ClientType ?? string.Empty,
             redirectUris,
             CreatedAt: null);
+    }
+
+    public async Task<ConsentInfoDto?> GetConsentInfoAsync(
+        string clientId,
+        IReadOnlyCollection<string> requestedScopes,
+        CancellationToken cancellationToken = default)
+    {
+        object? application = await applicationManager.FindByClientIdAsync(clientId, cancellationToken);
+        if (application is null)
+        {
+            return null;
+        }
+
+        string? displayName = await applicationManager.GetDisplayNameAsync(application, cancellationToken);
+
+        OpenIddictApplicationDescriptor descriptor = new();
+        await applicationManager.PopulateAsync(descriptor, application, cancellationToken);
+
+        string? logoUrl = null;
+        if (descriptor.Properties.TryGetValue("logoUrl", out JsonElement logoElement))
+        {
+            logoUrl = logoElement.Deserialize<string>();
+        }
+
+        List<ConsentScopeDto> scopeDtos = [];
+        foreach (string scopeName in requestedScopes)
+        {
+            object? scope = await scopeManager.FindByNameAsync(scopeName, cancellationToken);
+            string? description = scope is not null
+                ? await scopeManager.GetDescriptionAsync(scope, cancellationToken)
+                : null;
+            scopeDtos.Add(new ConsentScopeDto(scopeName, description));
+        }
+
+        return new ConsentInfoDto(clientId, displayName, logoUrl, scopeDtos);
     }
 
     private static string GenerateClientSecret()

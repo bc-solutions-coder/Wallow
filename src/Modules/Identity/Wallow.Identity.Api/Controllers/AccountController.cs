@@ -808,7 +808,7 @@ public sealed partial class AccountController(
     [AllowAnonymous]
     public async Task<IActionResult> SendMagicLink([FromBody] SendMagicLinkRequest request, CancellationToken ct)
     {
-        PasswordlessResult result = await passwordlessService.SendMagicLinkAsync(request.Email, ct);
+        PasswordlessResult result = await passwordlessService.SendMagicLinkAsync(request.Email, ct, request.ReturnUrl, request.ClientId);
         if (!result.Succeeded)
         {
             return BadRequest(new { succeeded = false, error = result.Error });
@@ -820,7 +820,7 @@ public sealed partial class AccountController(
 
     [HttpGet("passwordless/magic-link/verify")]
     [AllowAnonymous]
-    public async Task<IActionResult> VerifyMagicLink([FromQuery] string token, CancellationToken ct)
+    public async Task<IActionResult> VerifyMagicLink([FromQuery] string token, [FromQuery] bool rememberMe = false, CancellationToken ct = default)
     {
         PasswordlessResult result = await passwordlessService.ValidateMagicLinkAsync(token, ct);
         if (!result.Succeeded)
@@ -828,7 +828,8 @@ public sealed partial class AccountController(
             return Unauthorized(new { succeeded = false, error = result.Error });
         }
 
-        return Ok(new { succeeded = true, email = result.Email });
+        string signInTicket = CreateSignInTicket(result.Email!, rememberMe);
+        return Ok(new { succeeded = true, email = result.Email, signInTicket });
     }
 
     [HttpPost("passwordless/otp")]
@@ -855,7 +856,8 @@ public sealed partial class AccountController(
             return Unauthorized(new { succeeded = false, error = result.Error });
         }
 
-        return Ok(new { succeeded = true, email = result.Email });
+        string signInTicket = CreateSignInTicket(result.Email!, request.RememberMe);
+        return Ok(new { succeeded = true, email = result.Email, signInTicket });
     }
 
     [HttpPost("change-email")]

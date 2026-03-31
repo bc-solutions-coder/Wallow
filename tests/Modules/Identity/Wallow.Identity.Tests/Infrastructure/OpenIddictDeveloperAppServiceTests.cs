@@ -12,12 +12,14 @@ namespace Wallow.Identity.Tests.Infrastructure;
 public class OpenIddictDeveloperAppServiceTests
 {
     private readonly IOpenIddictApplicationManager _appManager;
+    private readonly IOpenIddictScopeManager _scopeManager;
     private readonly OpenIddictDeveloperAppService _sut;
 
     public OpenIddictDeveloperAppServiceTests()
     {
         _appManager = Substitute.For<IOpenIddictApplicationManager>();
-        _sut = new OpenIddictDeveloperAppService(_appManager, NullLogger<OpenIddictDeveloperAppService>.Instance);
+        _scopeManager = Substitute.For<IOpenIddictScopeManager>();
+        _sut = new OpenIddictDeveloperAppService(_appManager, _scopeManager, NullLogger<OpenIddictDeveloperAppService>.Instance);
     }
 
     [Fact]

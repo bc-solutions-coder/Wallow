@@ -13,10 +13,10 @@ public interface IAuthApiClient
     Task<List<string>> GetExternalProvidersAsync(CancellationToken ct = default);
     Task<string?> GetMatchingOrganizationByDomainAsync(string email, CancellationToken ct = default);
     Task<bool> RequestMembershipAsync(string emailDomain, CancellationToken ct = default);
-    Task<AuthResponse> SendMagicLinkAsync(string email, CancellationToken ct = default);
+    Task<AuthResponse> SendMagicLinkAsync(string email, string? returnUrl = null, string? clientId = null, CancellationToken ct = default);
     Task<AuthResponse> VerifyMagicLinkAsync(string token, CancellationToken ct = default);
     Task<AuthResponse> SendOtpAsync(string email, CancellationToken ct = default);
-    Task<AuthResponse> VerifyOtpAsync(string email, string code, CancellationToken ct = default);
+    Task<AuthResponse> VerifyOtpAsync(string email, string code, bool rememberMe = false, CancellationToken ct = default);
     Task<AuthResponse> VerifyMfaChallengeAsync(string code, CancellationToken ct = default);
     Task<AuthResponse> UseBackupCodeAsync(string code, CancellationToken ct = default);
     Task<InvitationDetailsResponse?> VerifyInvitationAsync(string token, CancellationToken ct = default);
@@ -24,6 +24,8 @@ public interface IAuthApiClient
     Task<MfaEnrollResponse?> EnrollTotpAsync(CancellationToken ct = default);
     Task<MfaConfirmEnrollmentResponse> ConfirmEnrollmentAsync(string secret, string code, CancellationToken ct = default);
     Task<bool> ExchangeEnrollmentTokenAsync(string token, CancellationToken ct = default);
+
+    Task<ConsentInfo?> GetConsentInfoAsync(string clientId, IReadOnlyList<string> scopes, CancellationToken ct = default);
 
     /// <summary>
     /// Returns a one-time relay key for cookies that were captured during interactive callbacks
@@ -35,6 +37,16 @@ public interface IAuthApiClient
 
 public record MfaEnrollResponse(string Secret, string QrUri);
 public record MfaConfirmEnrollmentResponse(bool Succeeded, IReadOnlyList<string>? BackupCodes = null, string? Error = null);
+
+public record ConsentInfo(
+    string ClientId,
+    string? DisplayName,
+    string? LogoUrl,
+    IReadOnlyList<ConsentScopeInfo> RequestedScopes);
+
+public record ConsentScopeInfo(
+    string Name,
+    string? Description);
 
 public record InvitationDetailsResponse(
     Guid Id,

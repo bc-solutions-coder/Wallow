@@ -60,6 +60,8 @@
       href: operations/observability.md
     - name: Audit Events
       href: operations/audit-events.md
+    - name: Reverse Proxy
+      href: operations/reverse-proxy.md
     - name: Troubleshooting
       href: operations/troubleshooting.md
 - name: Integrations
@@ -70,6 +72,8 @@
       href: integrations/dcr-integration.md
     - name: AsyncAPI
       href: integrations/asyncapi.md
+    - name: BFF Pattern
+      href: integrations/bff-pattern.md
 - name: API Reference
   items:
     - name: Service Accounts

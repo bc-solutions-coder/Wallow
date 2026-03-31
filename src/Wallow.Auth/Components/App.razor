@@ -1,5 +1,7 @@
 @using Wallow.Auth.Configuration
+@using Microsoft.AspNetCore.Http
 @inject BrandingOptions Branding
+@inject IHttpContextAccessor HttpContextAccessor
 
 <!DOCTYPE html>
 <html lang="en" class="@(Branding.Theme.DefaultMode == "dark" ? "dark" : "")">
@@ -7,7 +9,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <base href="/" />
+    <base href="@((HttpContextAccessor.HttpContext?.Request.PathBase ?? PathString.Empty).ToString() + "/")" />
     <link rel="icon" type="image/svg+xml" href="@Branding.AppIcon" />
     <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />

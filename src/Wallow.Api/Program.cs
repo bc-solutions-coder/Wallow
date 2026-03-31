@@ -338,6 +338,13 @@ try
 
     WebApplication app = builder.Build();
 
+    // Opt-in PathBase for reverse-proxy path-based routing (e.g. /api)
+    string? pathBase = app.Configuration["PathBase"];
+    if (!string.IsNullOrEmpty(pathBase))
+    {
+        app.UsePathBase(pathBase);
+    }
+
     // ============================================================================
     // WALLOW MODULES INITIALIZATION
     // Explicit module initialization via WallowModules.cs

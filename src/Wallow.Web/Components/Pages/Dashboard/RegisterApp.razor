@@ -136,7 +136,6 @@
                             <div>
                                 <label class="block text-sm font-medium text-[#3d2b1f] mb-1">Logo</label>
                                 <InputFile OnChange="OnLogoSelected"
-                                           data-testid="register-app-logo-input"
                                            AdditionalAttributes="@_logoFileAttributes" />
                                 <p class="text-xs text-[#3d2b1f]/50 mt-1">PNG, JPEG, or WebP. Max 2MB.</p>
                                 @if (_logoPreviewUrl is not null)
@@ -171,7 +170,8 @@
     private readonly Dictionary<string, object> _logoFileAttributes = new()
     {
         ["accept"] = ".png,.jpg,.jpeg,.webp",
-        ["class"] = "w-full border border-[#e8d5b7] rounded-md px-4 py-2 text-sm text-[#3d2b1f] bg-[#faf6f1]"
+        ["class"] = "w-full border border-[#e8d5b7] rounded-md px-4 py-2 text-sm text-[#3d2b1f] bg-[#faf6f1]",
+        ["data-testid"] = "register-app-logo-input"
     };
 
     private readonly string[] _availableScopes = ["inquiries.read", "inquiries.write", "announcements.read", "storage.read"];

@@ -14,10 +14,10 @@ COPY --parents tests/**/*.csproj ./
 RUN dotnet restore Wallow.slnx
 COPY src/ src/
 COPY docs/ docs/
-COPY docfx.json filterConfig.yml ./
-COPY templates/ templates/
+COPY docfx.json ./
+COPY docfx/ docfx/
 COPY .config/ .config/
-COPY --from=theme /main.css templates/wallow/public/main.css
+COPY --from=theme /main.css docfx/templates/wallow/public/main.css
 RUN dotnet tool restore && dotnet docfx docfx.json
 
 FROM nginx:alpine

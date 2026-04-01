@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Reads branding.json and generates templates/wallow/public/main.css
+ * Reads branding.json and generates docfx/templates/wallow/public/main.css
  * for the DocFX docs site. Maps Wallow brand colors to Bootstrap 5 CSS variables.
  *
  * Usage: node scripts/generate-docs-theme.mjs [path/to/branding.json]
@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
 
 const brandingPath = resolve(process.argv[2] || "branding.json");
-const outputPath = resolve("templates/wallow/public/main.css");
+const outputPath = resolve("docfx/templates/wallow/public/main.css");
 
 const branding = JSON.parse(readFileSync(brandingPath, "utf-8"));
 const theme = branding.theme;

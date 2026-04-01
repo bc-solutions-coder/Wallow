@@ -8,7 +8,7 @@ on:
       - 'src/**/*.cs'
       - 'branding.json'
       - 'docfx.json'
-      - 'templates/**'
+      - 'docfx/templates/**'
       - 'scripts/generate-docs-theme.mjs'
       - 'docker/docs/**'
   pull_request:
@@ -18,7 +18,7 @@ on:
       - 'src/**/*.cs'
       - 'branding.json'
       - 'docfx.json'
-      - 'templates/**'
+      - 'docfx/templates/**'
       - 'scripts/generate-docs-theme.mjs'
       - 'docker/docs/**'
 

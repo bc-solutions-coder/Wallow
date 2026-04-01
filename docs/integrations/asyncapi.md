@@ -60,7 +60,7 @@ curl http://localhost:5000/asyncapi/v1.json | jq .
 
 The catalog is generated at startup by scanning all `Wallow.*` assemblies:
 
-1. **Event discovery** — `EventFlowDiscovery` finds all classes implementing `IIntegrationEvent` in `Wallow.Shared.Contracts` namespaces. The namespace determines the module (e.g., `Wallow.Shared.Contracts.Billing.Events` → Billing).
+1. **Event discovery** — `EventFlowDiscovery` finds all classes implementing `IIntegrationEvent` in `Wallow.Shared.Contracts` namespaces. The namespace determines the module (e.g., `Wallow.Shared.Contracts.Storage.Events` → Storage).
 
 2. **Consumer discovery** — Wolverine handler classes with `Handle`/`HandleAsync` methods accepting an `IIntegrationEvent` parameter are identified as consumers. The handler's assembly determines the consuming module.
 

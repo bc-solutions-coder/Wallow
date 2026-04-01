@@ -8,7 +8,7 @@ Wallow uses EF Core as the primary ORM for all modules:
 
 | Approach | Technology | Use Case | Modules |
 |----------|------------|----------|---------|
-| **Relational (EF Core)** | EF Core + PostgreSQL | Standard CRUD, writes, change tracking | Identity, Billing, Storage, Notifications, Messaging, Announcements, Inquiries, ApiKeys, Branding |
+| **Relational (EF Core)** | EF Core + PostgreSQL | Standard CRUD, writes, change tracking | Identity, Storage, Notifications, Announcements, Inquiries, ApiKeys, Branding |
 | **Read Queries (Dapper)** | Dapper + PostgreSQL | Complex reporting, aggregations | Cross-module reporting services |
 
 All modules share a single PostgreSQL instance but use separate schemas for isolation.
@@ -20,46 +20,41 @@ All modules share a single PostgreSQL instance but use separate schemas for isol
 Each module has its own DbContext with automatic multi-tenancy filtering:
 
 ```csharp
-// src/Modules/Billing/Wallow.Billing.Infrastructure/Persistence/BillingDbContext.cs
-public sealed class BillingDbContext : DbContext
+// src/Modules/Notifications/Wallow.Notifications.Infrastructure/Persistence/NotificationsDbContext.cs
+public sealed class NotificationsDbContext : TenantAwareDbContext<NotificationsDbContext>
 {
-    private readonly ITenantContext _tenantContext;
+    // Email
+    public DbSet<EmailMessage> EmailMessages => Set<EmailMessage>();
+    public DbSet<EmailPreference> EmailPreferences => Set<EmailPreference>();
 
-    public DbSet<Invoice> Invoices => Set<Invoice>();
-    public DbSet<Payment> Payments => Set<Payment>();
-    public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    // SMS
+    public DbSet<SmsMessage> SmsMessages => Set<SmsMessage>();
+    public DbSet<SmsPreference> SmsPreferences => Set<SmsPreference>();
 
-    public BillingDbContext(
-        DbContextOptions<BillingDbContext> options,
-        ITenantContext tenantContext) : base(options)
+    // InApp Notifications
+    public DbSet<Notification> Notifications => Set<Notification>();
+
+    // Preferences
+    public DbSet<ChannelPreference> ChannelPreferences => Set<ChannelPreference>();
+
+    // Push
+    public DbSet<DeviceRegistration> DeviceRegistrations => Set<DeviceRegistration>();
+    public DbSet<TenantPushConfiguration> TenantPushConfigurations => Set<TenantPushConfiguration>();
+    public DbSet<PushMessage> PushMessages => Set<PushMessage>();
+
+    public NotificationsDbContext(DbContextOptions<NotificationsDbContext> options)
+        : base(options)
     {
-        _tenantContext = tenantContext;
+        ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Each module uses its own schema
-        modelBuilder.HasDefaultSchema("billing");
-        
-        // Apply all configurations from assembly
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(BillingDbContext).Assembly);
+        modelBuilder.HasDefaultSchema("notifications");
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(NotificationsDbContext).Assembly);
 
-        // Automatic tenant filtering for all ITenantScoped entities
-        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-        {
-            if (typeof(ITenantScoped).IsAssignableFrom(entityType.ClrType))
-            {
-                var parameter = Expression.Parameter(entityType.ClrType, "e");
-                var property = Expression.Property(parameter, nameof(ITenantScoped.TenantId));
-                var tenantId = Expression.Property(
-                    Expression.Constant(_tenantContext),
-                    nameof(ITenantContext.TenantId));
-                var equals = Expression.Equal(property, tenantId);
-                var lambda = Expression.Lambda(equals, parameter);
-
-                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
-            }
-        }
+        // Inherited from TenantAwareDbContext: automatic tenant filtering for all ITenantScoped entities
+        ApplyTenantQueryFilters(modelBuilder);
     }
 }
 ```
@@ -69,62 +64,63 @@ public sealed class BillingDbContext : DbContext
 Entity configurations are stored separately in the `Persistence/Configurations` folder:
 
 ```csharp
-// src/Modules/Billing/Wallow.Billing.Infrastructure/Persistence/Configurations/InvoiceConfiguration.cs
-public sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
+// src/Modules/Notifications/Wallow.Notifications.Infrastructure/Persistence/Configurations/NotificationConfiguration.cs
+public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notification>
 {
-    public void Configure(EntityTypeBuilder<Invoice> builder)
+    public void Configure(EntityTypeBuilder<Notification> builder)
     {
-        builder.ToTable("invoices");
+        builder.ToTable("notifications");
 
         // Primary key with strongly-typed ID
-        builder.HasKey(i => i.Id);
-        builder.Property(i => i.Id)
-            .HasConversion(new StronglyTypedIdConverter<InvoiceId>())
+        builder.HasKey(n => n.Id);
+        builder.Property(n => n.Id)
+            .HasConversion(new StronglyTypedIdConverter<NotificationId>())
             .HasColumnName("id")
             .ValueGeneratedNever();
 
         // Tenant ID (required for multi-tenancy)
-        builder.Property(i => i.TenantId)
-            .HasConversion(id => id.Value, value => TenantId.Create(value))
+        builder.Property(n => n.TenantId)
+            .HasConversion(new StronglyTypedIdConverter<TenantId>())
             .HasColumnName("tenant_id")
             .IsRequired();
 
-        // Value object (owned entity)
-        builder.OwnsOne(i => i.TotalAmount, money =>
-        {
-            money.Property(m => m.Amount)
-                .HasColumnName("total_amount")
-                .HasPrecision(18, 2)
-                .IsRequired();
+        builder.HasIndex(n => n.TenantId);
 
-            money.Property(m => m.Currency)
-                .HasColumnName("currency")
-                .HasMaxLength(3)
-                .IsRequired();
-        });
+        builder.Property(n => n.UserId)
+            .HasColumnName("user_id")
+            .IsRequired();
 
-        // JSONB column for flexible data
-        builder.Property(i => i.CustomFields)
-            .HasColumnName("custom_fields")
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => v == null ? null : JsonSerializer.Serialize(v, JsonOptions),
-                v => v == null ? null : JsonSerializer.Deserialize<Dictionary<string, object>>(v, JsonOptions))
-            .Metadata.SetValueComparer(new DictionaryValueComparer());
+        builder.Property(n => n.Type)
+            .HasColumnName("type")
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired();
+
+        builder.Property(n => n.Title)
+            .HasColumnName("title")
+            .HasMaxLength(200)
+            .IsRequired();
+
+        builder.Property(n => n.Message)
+            .HasColumnName("message")
+            .HasMaxLength(1000)
+            .IsRequired();
+
+        builder.Property(n => n.IsRead)
+            .HasColumnName("is_read")
+            .IsRequired();
+
+        builder.Property(n => n.IsArchived)
+            .HasColumnName("is_archived")
+            .HasDefaultValue(false)
+            .IsRequired();
 
         // Ignore domain events (not persisted)
-        builder.Ignore(i => i.DomainEvents);
-
-        // Relationships
-        builder.HasMany(i => i.LineItems)
-            .WithOne()
-            .HasForeignKey(li => li.InvoiceId)
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.Ignore(n => n.DomainEvents);
 
         // Indexes
-        builder.HasIndex(i => i.TenantId);
-        builder.HasIndex(i => i.InvoiceNumber).IsUnique();
-        builder.HasIndex(i => i.Status);
+        builder.HasIndex(n => n.UserId);
+        builder.HasIndex(n => n.CreatedAt);
     }
 }
 ```
@@ -135,10 +131,10 @@ Wallow uses strongly-typed IDs to prevent mixing different entity IDs:
 
 ```csharp
 // Define ID type in Domain layer
-public readonly record struct InvoiceId(Guid Value) : IStronglyTypedId<InvoiceId>
+public readonly record struct NotificationId(Guid Value) : IStronglyTypedId<NotificationId>
 {
-    public static InvoiceId New() => new(Guid.NewGuid());
-    public static InvoiceId Create(Guid value) => new(value);
+    public static NotificationId New() => new(Guid.NewGuid());
+    public static NotificationId Create(Guid value) => new(value);
 }
 
 // Generic converter for EF Core
@@ -173,52 +169,57 @@ Repositories abstract data access and follow this structure:
 
 **Interface (Application Layer):**
 ```csharp
-// src/Modules/Billing/Wallow.Billing.Application/Interfaces/IInvoiceRepository.cs
-public interface IInvoiceRepository
+// src/Modules/Notifications/Wallow.Notifications.Application/Channels/InApp/Interfaces/INotificationRepository.cs
+public interface INotificationRepository
 {
-    Task<Invoice?> GetByIdAsync(InvoiceId id, CancellationToken ct = default);
-    Task<Invoice?> GetByIdWithLineItemsAsync(InvoiceId id, CancellationToken ct = default);
-    Task<IReadOnlyList<Invoice>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
-    Task<bool> ExistsByInvoiceNumberAsync(string invoiceNumber, CancellationToken ct = default);
-    void Add(Invoice invoice);
-    void Update(Invoice invoice);
-    void Remove(Invoice invoice);
-    Task SaveChangesAsync(CancellationToken ct = default);
+    void Add(Notification notification);
+    Task<Notification?> GetByIdAsync(NotificationId id, CancellationToken cancellationToken = default);
+    Task<PagedResult<Notification>> GetByUserIdPagedAsync(
+        Guid userId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<int> GetUnreadCountAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task MarkAllAsReadAsync(Guid userId, DateTime readAt, CancellationToken cancellationToken = default);
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 ```
 
 **Implementation (Infrastructure Layer):**
 ```csharp
-// src/Modules/Billing/Wallow.Billing.Infrastructure/Persistence/Repositories/InvoiceRepository.cs
-public sealed class InvoiceRepository : IInvoiceRepository
+// src/Modules/Notifications/Wallow.Notifications.Infrastructure/Persistence/Repositories/NotificationRepository.cs
+public sealed class NotificationRepository(NotificationsDbContext context) : INotificationRepository
 {
-    private readonly BillingDbContext _context;
-
-    public InvoiceRepository(BillingDbContext context)
+    public void Add(Notification notification)
     {
-        _context = context;
+        context.Notifications.Add(notification);
     }
 
-    public async Task<Invoice?> GetByIdAsync(InvoiceId id, CancellationToken ct = default)
+    public Task<Notification?> GetByIdAsync(NotificationId id, CancellationToken cancellationToken = default)
     {
-        return await _context.Invoices.FindAsync([id], ct);
+        return context.Notifications
+            .AsTracking()
+            .FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
     }
 
-    public async Task<Invoice?> GetByIdWithLineItemsAsync(InvoiceId id, CancellationToken ct = default)
+    public async Task<PagedResult<Notification>> GetByUserIdPagedAsync(
+        Guid userId, int page, int pageSize, CancellationToken cancellationToken = default)
     {
-        return await _context.Invoices
-            .Include(i => i.LineItems)
-            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        DateTime utcNow = DateTime.UtcNow;
+
+        IQueryable<Notification> query = context.Notifications
+            .Where(n => n.UserId == userId && !n.IsArchived && (n.ExpiresAt == null || n.ExpiresAt > utcNow))
+            .OrderByDescending(n => n.CreatedAt);
+
+        int totalCount = await query.CountAsync(cancellationToken);
+        List<Notification> items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<Notification>(items, totalCount, page, pageSize);
     }
 
-    public void Add(Invoice invoice)
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        _context.Invoices.Add(invoice);
-    }
-
-    public async Task SaveChangesAsync(CancellationToken ct = default)
-    {
-        await _context.SaveChangesAsync(ct);
+        await context.SaveChangesAsync(cancellationToken);
     }
 }
 ```
@@ -242,17 +243,16 @@ public sealed class InvoiceRepository : IInvoiceRepository
 For reporting queries, the codebase uses `IReadDbContext<TContext>` which provides a read-only DbContext instance (potentially routed to a read replica):
 
 ```csharp
-// src/Modules/Billing/Wallow.Billing.Infrastructure/Services/InvoiceReportService.cs
-public sealed class InvoiceReportService(IReadDbContext<BillingDbContext> readDbContext) : IInvoiceReportService
+// Example read-optimized query using IReadDbContext
+public sealed class NotificationReportService(IReadDbContext<NotificationsDbContext> readDbContext) : INotificationReportService
 {
-    public async Task<IReadOnlyList<InvoiceReportRow>> GetInvoicesAsync(
+    public async Task<IReadOnlyList<NotificationSummaryRow>> GetNotificationsAsync(
         DateTime from, DateTime to, CancellationToken ct = default)
     {
-        return await readDbContext.Context.Invoices
-            .Where(i => i.Status != InvoiceStatus.Draft)
-            .Where(i => i.CreatedAt >= from && i.CreatedAt < to)
-            .OrderByDescending(i => i.CreatedAt)
-            .Select(i => new InvoiceReportRow(...))
+        return await readDbContext.Context.Notifications
+            .Where(n => n.CreatedAt >= from && n.CreatedAt < to)
+            .OrderByDescending(n => n.CreatedAt)
+            .Select(n => new NotificationSummaryRow(n.Id, n.Title, n.Type, n.CreatedAt))
             .ToListAsync(ct);
     }
 }
@@ -269,10 +269,8 @@ Each module uses its own PostgreSQL schema:
 | Module | Schema |
 |--------|--------|
 | Identity | `identity` |
-| Billing | `billing` |
 | Storage | `storage` |
 | Notifications | `notifications` |
-| Messaging | `messaging` |
 | Announcements | `announcements` |
 | Inquiries | `inquiries` |
 | ApiKeys | `apikeys` |
@@ -281,7 +279,7 @@ Each module uses its own PostgreSQL schema:
 
 This is configured in each DbContext:
 ```csharp
-modelBuilder.HasDefaultSchema("billing");
+modelBuilder.HasDefaultSchema("notifications");
 ```
 
 ### Connection String Configuration
@@ -303,26 +301,24 @@ Create migrations per module:
 ```bash
 # Create a new migration
 dotnet ef migrations add MigrationName \
-    --project src/Modules/Billing/Wallow.Billing.Infrastructure \
+    --project src/Modules/Notifications/Wallow.Notifications.Infrastructure \
     --startup-project src/Wallow.Api \
-    --context BillingDbContext
+    --context NotificationsDbContext
 
 # Apply migrations
 dotnet ef database update \
-    --project src/Modules/Billing/Wallow.Billing.Infrastructure \
+    --project src/Modules/Notifications/Wallow.Notifications.Infrastructure \
     --startup-project src/Wallow.Api \
-    --context BillingDbContext
+    --context NotificationsDbContext
 ```
 
 Migrations run automatically on startup via module initialization:
 
 ```csharp
-public static async Task<WebApplication> InitializeBillingModuleAsync(this WebApplication app)
+public static Task<WebApplication> InitializeNotificationsModuleAsync(
+    this WebApplication app)
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
-    await db.Database.MigrateAsync();
-    return app;
+    return Task.FromResult(app);
 }
 ```
 
@@ -354,7 +350,7 @@ docker exec -it wallow-postgres psql -U wallow -d wallow
 \dn
 
 # List tables in a schema
-\dt billing.*
+\dt notifications.*
 ```
 
 ## Best Practices
@@ -381,21 +377,21 @@ docker exec -it wallow-postgres psql -U wallow -d wallow
 **EF Core:**
 ```csharp
 // Implicit transaction via SaveChangesAsync
-_context.Invoices.Add(invoice);
-_context.Payments.Add(payment);
-await _context.SaveChangesAsync(ct);  // Single transaction
+context.Notifications.Add(notification);
+context.EmailMessages.Add(emailMessage);
+await context.SaveChangesAsync(ct);  // Single transaction
 ```
 
 **Cross-DbContext (use with caution):**
 ```csharp
-using var transaction = await _billingContext.Database.BeginTransactionAsync();
+using IDbContextTransaction transaction = await notificationsContext.Database.BeginTransactionAsync();
 try
 {
-    _billingContext.Invoices.Add(invoice);
-    await _billingContext.SaveChangesAsync();
-    
+    notificationsContext.Notifications.Add(notification);
+    await notificationsContext.SaveChangesAsync();
+
     // Other operations...
-    
+
     await transaction.CommitAsync();
 }
 catch

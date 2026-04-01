@@ -28,7 +28,7 @@ Content-Type: application/json
 {
   "name": "Production Backend",
   "description": "Main production server integration",
-  "scopes": ["invoices.read", "invoices.write", "payments.read"]
+  "scopes": ["announcements.read", "announcements.manage", "notifications.read"]
 }
 ```
 
@@ -40,7 +40,7 @@ Response (201 Created):
   "clientId": "sa-tenant12-production-backend",
   "clientSecret": "xK9mN2pL8qR5sT7vW3yZ1aB4cD6eF8gH0iJ2kL5mN7oP9qR1sT3uV5wX7yZ9",
   "tokenEndpoint": "https://api.yourplatform.com/connect/token",
-  "scopes": ["invoices.read", "invoices.write", "payments.read"],
+  "scopes": ["announcements.read", "announcements.manage", "notifications.read"],
   "warning": "Save this secret now. It will not be shown again."
 }
 ```
@@ -62,7 +62,7 @@ curl -X POST https://api.yourplatform.com/connect/token \
 Use the access token in the `Authorization` header:
 
 ```bash
-curl -X GET https://api.yourplatform.com/api/v1/billing/invoices \
+curl -X GET https://api.yourplatform.com/api/v1/announcements \
   -H "Authorization: Bearer <access-token>"
 ```
 
@@ -98,7 +98,7 @@ Authorization: Bearer <user-token>
 Content-Type: application/json
 
 {
-  "scopes": ["invoices.read", "invoices.write", "payments.read", "subscriptions.read"]
+  "scopes": ["announcements.read", "announcements.manage", "notifications.read", "inquiries.read"]
 }
 ```
 
@@ -135,7 +135,7 @@ Returns 204 No Content.
 ### List Available Scopes
 
 ```http
-GET /api/v1/identity/scopes?category=Billing
+GET /api/v1/identity/scopes?category=Identity
 Authorization: Bearer <user-token>
 ```
 
@@ -144,19 +144,6 @@ Returns scopes with `code`, `displayName`, `category`, `description`, and `isDef
 ---
 
 ## Available Scopes
-
-### Billing
-
-| Scope | Description | Default |
-|-------|-------------|---------|
-| `billing.read` | Read billing data | Yes |
-| `billing.manage` | Manage billing settings and configuration | No |
-| `invoices.read` | Read invoices and invoice data | Yes |
-| `invoices.write` | Create and update invoices | No |
-| `payments.read` | Read payment records | Yes |
-| `payments.write` | Process and record payments | No |
-| `subscriptions.read` | Read subscription data | Yes |
-| `subscriptions.write` | Manage subscriptions | No |
 
 ### Identity
 
@@ -192,7 +179,6 @@ Returns scopes with `code`, `displayName`, `category`, `description`, and `isDef
 
 | Scope | Description | Default |
 |-------|-------------|---------|
-| `messaging.access` | Access messaging features | No |
 | `announcements.read` | Read announcements | Yes |
 | `announcements.manage` | Manage announcements | No |
 | `changelog.manage` | Manage changelog entries | No |

@@ -240,7 +240,7 @@ curl -X POST http://localhost:5000/api/auth/refresh \
   "type": "https://tools.ietf.org/html/rfc7231#section-6.5.3",
   "title": "Forbidden",
   "status": 403,
-  "detail": "User does not have required permission: Billing.InvoicesCreate"
+  "detail": "User does not have required permission: Announcements.AnnouncementsCreate"
 }
 ```
 
@@ -286,8 +286,8 @@ Ensure your JWT contains:
 **Using Dapper without tenant filter:**
 When using Dapper directly, you must filter by tenant manually:
 ```csharp
-var sql = "SELECT * FROM billing.invoices WHERE tenant_id = @TenantId";
-await connection.QueryAsync<Invoice>(sql, new { TenantId = _tenantContext.TenantId.Value });
+string sql = "SELECT * FROM announcements.announcements WHERE tenant_id = @TenantId";
+await connection.QueryAsync<Announcement>(sql, new { TenantId = _tenantContext.TenantId.Value });
 ```
 
 **Test environment:**
@@ -305,16 +305,16 @@ client.DefaultRequestHeaders.Add("X-Tenant-Id", "your-tenant-guid");
 #### Symptom
 ```
 Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes
-  ---> Npgsql.PostgresException: 42P01: relation "billing.invoices" does not exist
+  ---> Npgsql.PostgresException: 42P01: relation "identity.users" does not exist
 ```
 
 #### Diagnosis
 ```bash
 # Check migration status
 dotnet ef migrations list \
-  --project src/Modules/Billing/Wallow.Billing.Infrastructure \
+  --project src/Modules/Identity/Wallow.Identity.Infrastructure \
   --startup-project src/Wallow.Api \
-  --context BillingDbContext
+  --context IdentityDbContext
 ```
 
 #### Solutions
@@ -322,9 +322,9 @@ dotnet ef migrations list \
 **Apply pending migrations:**
 ```bash
 dotnet ef database update \
-  --project src/Modules/Billing/Wallow.Billing.Infrastructure \
+  --project src/Modules/Identity/Wallow.Identity.Infrastructure \
   --startup-project src/Wallow.Api \
-  --context BillingDbContext
+  --context IdentityDbContext
 ```
 
 **Migration history mismatch:**
@@ -342,9 +342,9 @@ The migration '20260215_AddNewField' has already been applied to the database
 ```bash
 # Remove the conflicting migration
 dotnet ef migrations remove \
-  --project src/Modules/Billing/Wallow.Billing.Infrastructure \
+  --project src/Modules/Identity/Wallow.Identity.Infrastructure \
   --startup-project src/Wallow.Api \
-  --context BillingDbContext
+  --context IdentityDbContext
 ```
 
 ### EF Core Tracking Issues
@@ -373,7 +373,7 @@ existingEntry.State = EntityState.Detached;
 **Use new DbContext scope:**
 ```csharp
 using var scope = _serviceProvider.CreateScope();
-var context = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+var context = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
 // Now you have a fresh tracking context
 ```
 
@@ -696,7 +696,7 @@ client.DefaultRequestHeaders.Add("X-Test-Auth-Skip", "true");
 
 #### Symptom
 ```
-error NU1101: Unable to find package Wallow.Billing.Domain
+error NU1101: Unable to find package Wallow.Storage.Domain
 ```
 
 #### Solutions
@@ -728,7 +728,7 @@ curl https://api.nuget.org/v3/index.json
 
 #### Symptom
 ```
-error CS0246: The type or namespace name 'InvoiceDto' could not be found
+error CS0246: The type or namespace name 'AnnouncementDto' could not be found
 ```
 
 #### Solutions
@@ -736,13 +736,13 @@ error CS0246: The type or namespace name 'InvoiceDto' could not be found
 **Check project references:**
 ```bash
 # View project references
-dotnet list src/Modules/Billing/Wallow.Billing.Api/Wallow.Billing.Api.csproj reference
+dotnet list src/Modules/Announcements/Wallow.Announcements.Api/Wallow.Announcements.Api.csproj reference
 ```
 
 **Add missing reference:**
 ```bash
-dotnet add src/Modules/Billing/Wallow.Billing.Api/Wallow.Billing.Api.csproj \
-  reference src/Modules/Billing/Wallow.Billing.Application/Wallow.Billing.Application.csproj
+dotnet add src/Modules/Announcements/Wallow.Announcements.Api/Wallow.Announcements.Api.csproj \
+  reference src/Modules/Announcements/Wallow.Announcements.Application/Wallow.Announcements.Application.csproj
 ```
 
 **Clean and rebuild:**

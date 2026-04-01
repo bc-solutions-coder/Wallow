@@ -41,7 +41,6 @@ Recurring jobs are registered at startup in `Program.cs` using `IRecurringJobMan
 | `RetryFailedEmailsJob` | Every 5 minutes (feature-flagged) | `src/Modules/Notifications/Wallow.Notifications.Infrastructure/Jobs/RetryFailedEmailsJob.cs` |
 | `OpenIddictTokenPruningJob` | Every 4 hours | `src/Modules/Identity/Wallow.Identity.Infrastructure/Jobs/OpenIddictTokenPruningJob.cs` |
 | `ExpiredInvitationPruningJob` | Every hour | `src/Modules/Identity/Wallow.Identity.Infrastructure/Jobs/ExpiredInvitationPruningJob.cs` |
-| `FlushUsageJob` | Every 5 minutes | `src/Modules/Billing/Wallow.Billing.Infrastructure/Jobs/FlushUsageJob.cs` |
 
 The `RetryFailedEmailsJob` is conditionally registered behind the `Modules.Notifications` feature flag.
 

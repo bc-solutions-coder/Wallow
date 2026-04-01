@@ -39,7 +39,7 @@ Wallow's realtime system is split into two channels:
 | Use Case | Channel | Why |
 |----------|---------|-----|
 | Push notifications | SSE | One-way, supports audience scoping |
-| Event broadcasts (inquiry updates, billing) | SSE | One-way with permission filtering |
+| Event broadcasts (inquiry updates, announcements) | SSE | One-way with permission filtering |
 | Presence / online status | SignalR | Bidirectional, needs group management |
 | Page context tracking | SignalR | Bidirectional, updates shared state |
 | Group join/leave | SignalR | Requires client-initiated actions |
@@ -49,7 +49,7 @@ Wallow's realtime system is split into two channels:
 ### Endpoint
 
 ```
-GET /events?subscribe=inquiries,billing,notifications
+GET /events?subscribe=inquiries,announcements,notifications
 Authorization: Bearer <jwt>
 Accept: text/event-stream
 ```

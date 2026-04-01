@@ -104,7 +104,7 @@ The most common pattern: check cache first, fall back to the data source on a mi
 
 ### Direct Valkey Access
 
-For counters and complex data structures, inject `IConnectionMultiplexer` directly. The `ValkeyMeteringService` (`src/Modules/Billing/Wallow.Billing.Infrastructure/Services/ValkeyMeteringService.cs`) uses this approach for high-performance increment operations and quota checks.
+For counters and complex data structures, inject `IConnectionMultiplexer` directly. This approach is useful for high-performance increment operations, quota checks, and presence tracking.
 
 ### Batched Operations
 

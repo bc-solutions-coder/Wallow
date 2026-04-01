@@ -72,7 +72,7 @@ To assign scopes after registration, an admin uses:
 
 Until scopes are assigned, API calls return **403 Forbidden**.
 
-The full list of registered scopes is defined in `IdentityInfrastructureExtensions.cs` and includes scopes such as `inquiries.read`, `inquiries.write`, `billing.read`, `storage.read`, `messaging.access`, and others.
+The full list of registered scopes is defined in `IdentityInfrastructureExtensions.cs` and includes scopes such as `inquiries.read`, `inquiries.write`, `storage.read`, `announcements.read`, and others.
 
 ## Production Registration
 

@@ -85,14 +85,14 @@ Work through this list to build a mental map of the codebase.
 - [ ] **Read `src/Wallow.Api/Program.cs`** -- See the middleware pipeline (exception handler, auth, tenant resolution, permission expansion, authorization), Wolverine setup, Hangfire, SignalR, and health checks.
 - [ ] **Read `src/Wallow.Api/WallowModules.cs`** -- See explicit module registration via `IFeatureManager`. Identity is always registered; all other modules are behind feature flags.
 
-### Module Deep Dive: Billing
+### Module Deep Dive: Notifications
 
-Billing is the reference implementation for DDD patterns. Start here.
+Notifications is a strong reference implementation for DDD patterns with multi-channel delivery. Start here.
 
-- [ ] **Domain:** `src/Modules/Billing/Wallow.Billing.Domain/Entities/` -- State machines, domain events, business rules.
-- [ ] **Application:** `src/Modules/Billing/Wallow.Billing.Application/Commands/` -- Command records, FluentValidation validators, static handler classes.
-- [ ] **Infrastructure:** `src/Modules/Billing/Wallow.Billing.Infrastructure/Persistence/BillingDbContext.cs` -- Schema name, multi-tenancy query filters, JSONB configuration.
-- [ ] **API:** `src/Modules/Billing/Wallow.Billing.Api/Controllers/` -- Thin controllers that delegate to Wolverine `IMessageBus`.
+- [ ] **Domain:** `src/Modules/Notifications/Wallow.Notifications.Domain/Channels/` -- Aggregates per channel (Email, InApp, Push, SMS), Value Objects (`EmailAddress`, `EmailContent`), domain events.
+- [ ] **Application:** `src/Modules/Notifications/Wallow.Notifications.Application/Channels/` -- Commands, queries, and handlers organized by channel, plus integration event handlers in `EventHandlers/`.
+- [ ] **Infrastructure:** `src/Modules/Notifications/Wallow.Notifications.Infrastructure/Persistence/NotificationsDbContext.cs` -- Schema name, multi-tenancy query filters, provider pattern for channel adapters.
+- [ ] **API:** `src/Modules/Notifications/Wallow.Notifications.Api/Controllers/` -- Thin controllers that delegate to Wolverine `IMessageBus`.
 
 ### Authentication and Multi-Tenancy
 
@@ -136,15 +136,15 @@ For the full step-by-step guide to creating a new module, see the [Developer Gui
 
 **Why doesn't Identity use CQRS?** ASP.NET Core Identity is the source of truth for user accounts. CQRS would add ceremony without benefit. Exception: Service Accounts do use CQRS because they have local state.
 
-**Where is email handling?** In the Notifications module. It consumes events from Identity and Billing to send transactional emails.
+**Where is email handling?** In the Notifications module. It consumes events from Identity, Announcements, and Inquiries to send transactional emails.
 
-**Which module is the best example?** Billing. Rich domain model, full CQRS, FluentValidation, state machine, value objects, strongly-typed IDs, integration events, and comprehensive tests.
+**Which module is the best example?** Notifications. Multi-channel delivery, full CQRS, FluentValidation, Value Objects (`EmailAddress`, `EmailContent`), strongly-typed IDs, integration events, provider pattern, and comprehensive tests.
 
 ---
 
 ## 6. Testing
 
-Run all tests with `./scripts/run-tests.sh`. Run a specific module with `./scripts/run-tests.sh billing`.
+Run all tests with `./scripts/run-tests.sh`. Run a specific module with `./scripts/run-tests.sh identity`.
 
 **Unit tests** test domain entities and handlers in isolation with mocked dependencies. **Integration tests** use Testcontainers to spin up real Postgres and Valkey. **Architecture tests** (`Wallow.Architecture.Tests`) enforce structural rules such as module isolation and dependency direction.
 
@@ -170,7 +170,7 @@ cd docker && docker compose down -v && docker compose up -d
 dotnet run --project src/Wallow.Api  # Re-runs migrations
 ```
 
-**Can I query across modules?** No. Modules are autonomous. If Module A needs data from Module B, Module B publishes an event and Module A stores a local copy (eventual consistency). For rare cases requiring synchronous cross-module reads, `Shared.Contracts` defines query service interfaces (e.g., `IInvoiceQueryService`) implemented in the owning module's Infrastructure layer.
+**Can I query across modules?** No. Modules are autonomous. If Module A needs data from Module B, Module B publishes an event and Module A stores a local copy (eventual consistency). For rare cases requiring synchronous cross-module reads, `Shared.Contracts` defines query service interfaces implemented in the owning module's Infrastructure layer.
 
 ---
 
@@ -192,6 +192,6 @@ dotnet run --project src/Wallow.Api  # Re-runs migrations
 ## Next Steps
 
 1. Pick a small issue from the backlog
-2. Read the Billing module end-to-end (it is the reference implementation)
+2. Read the Notifications module end-to-end (it is the reference implementation)
 3. Pair with a teammate on your first PR
 4. Run the tests and see what breaks when you change things

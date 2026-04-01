@@ -129,7 +129,7 @@ public static class MyModuleAuditHandlers
 
 Wolverine auto-discovers handlers in all `Wallow.*` assemblies, so no explicit registration is needed.
 
-**2. Use a descriptive, consistent `EventType` string.** Use PascalCase. Prefix with a module name if the event is module-specific (e.g., `Billing.InvoiceAccessed`).
+**2. Use a descriptive, consistent `EventType` string.** Use PascalCase. Prefix with a module name if the event is module-specific (e.g., `Storage.FileUploaded`).
 
 **3. Populate `IpAddress` only when it is available on the source event.** Do not fabricate or forward stale IP values.
 

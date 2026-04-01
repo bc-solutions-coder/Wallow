@@ -24,7 +24,7 @@ All commits must follow the Conventional Commits specification:
 | `chore` | *(no release)* | `chore: update NuGet packages` |
 | `refactor` | *(no release)* | `refactor: extract base entity class` |
 | `docs` | *(no release)* | `docs: add caching guide` |
-| `test` | *(no release)* | `test: add billing integration tests` |
+| `test` | *(no release)* | `test: add identity integration tests` |
 | `ci` | *(no release)* | `ci: add Docker build step` |
 
 > **Note:** release-please only creates releases for `fix:` (patch) and `feat:` (minor) commits. Other types appear in the changelog but don't trigger a version bump on their own.
@@ -42,7 +42,7 @@ BREAKING CHANGE: TenantId is now a strongly-typed ID wrapping a Guid.
 Scope is optional but useful for changelogs:
 
 ```
-feat(billing): add Stripe webhook handler
+feat(identity): add TOTP authentication
 fix(identity): correct token refresh logic
 chore(deps): bump Wolverine to 3.x
 ```
@@ -63,7 +63,7 @@ feature branch ──PR──► main branch ──release PR──► tag + Git
 
 ```
 1. feat: add payments       → merge to main → Release PR updated (0.1.0 → 0.2.0)
-2. fix: billing edge case   → merge to main → Release PR updated (0.1.0 → 0.2.0)
+2. fix: tenant resolver edge case   → merge to main → Release PR updated (0.1.0 → 0.2.0)
 3. merge Release PR         →               → v0.2.0 tag + GitHub Release + Docker image
 4. fix: tenant resolver     → merge to main → new Release PR (0.2.0 → 0.2.1)
 ```

@@ -12,7 +12,7 @@ This document assesses Wallow's implementation of Domain-Driven Design (DDD) and
 | **DDD** | 7/10 | Good foundations, gaps in consistency |
 | **Overall Maturity** | 8/10 | Intermediate-to-Advanced |
 
-The codebase demonstrates solid foundational patterns with excellent consistency across most modules. The Billing module is the gold standard. Strategic gaps exist in domain services and event-sourced module consistency.
+The codebase demonstrates solid foundational patterns with excellent consistency across most modules. The Notifications module is the gold standard. Strategic gaps exist in domain services and event-sourced module consistency.
 
 ---
 
@@ -85,16 +85,16 @@ The dependency direction is textbook correct:
 
 ### Aggregates (8/10)
 
-Strong in traditional modules (Billing, Notifications, Storage). Aggregates protect invariants and raise domain events.
+Strong in traditional modules (Notifications, Storage, Announcements). Aggregates protect invariants and raise domain events.
 
 ### Entities vs Value Objects (8/10)
 
-**Money** in Billing is an excellent Value Object example: immutable, with operator overloading for domain language and a factory method that enforces validation.
+**EmailAddress** in Notifications is an excellent Value Object example: immutable, with input normalization and a factory method that enforces validation via regex.
 
 ### Domain Events (7/10)
 
 **Good:**
-- Past-tense naming (`InvoiceCreatedDomainEvent`)
+- Past-tense naming (`NotificationCreatedDomainEvent`)
 - Raised from aggregates
 - Handlers bridge to integration events via Wolverine
 
@@ -124,7 +124,7 @@ Wallow uses two distinct architectural patterns. Understanding these is essentia
 
 ### Pattern 1: Traditional DDD
 
-**Used by:** Billing, Notifications, Messaging, Announcements, Storage, Inquiries.
+**Used by:** Notifications, Announcements, Storage, Inquiries.
 
 ```
 Domain:         Aggregates with behavior, Value Objects, Domain Events
@@ -173,14 +173,12 @@ Infrastructure: Heavy services wrapping external system
 
 | Module | Pattern | DDD Score | Notes |
 |--------|---------|-----------|-------|
-| **Billing** | Traditional | 9/10 | Reference implementation. Proper aggregates, Money VO, domain events. |
+| **Notifications** | Traditional | 9/10 | Reference implementation. Multi-channel delivery, Value Objects (`EmailAddress`, `EmailContent`), domain events, provider pattern. |
 
 ### Tier 2: Production Ready
 
 | Module | Pattern | DDD Score | Notes |
 |--------|---------|-----------|-------|
-| **Notifications** | Traditional | 8/10 | Email delivery via MailKit. Good Value Objects (`EmailAddress`, `EmailContent`). |
-| **Messaging** | Traditional | 7/10 | In-app real-time messaging via SignalR. |
 | **Announcements** | Traditional | 7/10 | Broadcast announcements with targeting rules. |
 | **Storage** | Traditional (simple) | 6/10 | Raw file abstraction. `RetentionPolicy` Value Object. |
 
@@ -219,7 +217,6 @@ Value Objects are used in multiple modules:
 
 | Module | Value Objects |
 |--------|--------------|
-| Billing | `Money` (currency, arithmetic) |
 | Notifications | `EmailAddress` (validation), `EmailContent` |
 | Storage | `RetentionPolicy` |
 
@@ -249,7 +246,7 @@ Is this module wrapping an external system?
 │         • Heavy infrastructure services
 │         • Clear interface boundary
 │
-└── NO → Use Traditional DDD Pattern (like Billing)
+└── NO → Use Traditional DDD Pattern (like Notifications)
          • Full aggregate design
          • EF Core writes, Dapper reads
          • Rich Value Objects
@@ -268,93 +265,97 @@ Is this module wrapping an external system?
 
 ## 7. Code Examples
 
-### Gold Standard: Billing Invoice Aggregate
+### Gold Standard: Notifications Notification Aggregate
 
 ```csharp
-public sealed class Invoice : AggregateRoot<InvoiceId>, ITenantScoped, IHasCustomFields
+public sealed class Notification : AggregateRoot<NotificationId>, ITenantScoped
 {
-    private readonly List<InvoiceLineItem> _lineItems = [];
-    public IReadOnlyCollection<InvoiceLineItem> LineItems => _lineItems.AsReadOnly();
+    public TenantId TenantId { get; init; }
+    public Guid UserId { get; private set; }
+    public NotificationType Type { get; private set; }
+    public string Title { get; private set; } = null!;
+    public string Message { get; private set; } = null!;
+    public bool IsRead { get; private set; }
+    public DateTime? ReadAt { get; private set; }
+    public bool IsArchived { get; private set; }
 
-    public void AddLineItem(string description, Money unitPrice, int quantity,
-        Guid updatedByUserId, TimeProvider timeProvider)
+    public static Notification Create(
+        TenantId tenantId, Guid userId, NotificationType type,
+        string title, string message, TimeProvider timeProvider,
+        string? actionUrl = null, string? sourceModule = null,
+        DateTime? expiresAt = null)
     {
-        if (Status != InvoiceStatus.Draft)
-            throw new InvalidInvoiceException("Can only add line items to draft invoices");
-        if (quantity <= 0)
-            throw new BusinessRuleException("Billing.InvalidQuantity",
-                "Quantity must be greater than zero");
-
-        InvoiceLineItem lineItem = InvoiceLineItem.Create(Id, description, unitPrice, quantity);
-        _lineItems.Add(lineItem);
-        RecalculateTotal();
-        SetUpdated(timeProvider.GetUtcNow(), updatedByUserId);
+        return new Notification(tenantId, userId, type, title, message,
+            actionUrl, sourceModule, expiresAt, timeProvider);
     }
 
-    public void MarkAsPaid(Guid paymentId, Guid updatedByUserId, TimeProvider timeProvider)
+    public void MarkAsRead(TimeProvider timeProvider)
     {
-        if (Status != InvoiceStatus.Issued && Status != InvoiceStatus.Overdue)
-            throw new InvalidInvoiceException(
-                "Can only mark issued or overdue invoices as paid");
+        IsRead = true;
+        ReadAt = timeProvider.GetUtcNow().UtcDateTime;
+        SetUpdated(timeProvider.GetUtcNow());
 
-        Status = InvoiceStatus.Paid;
-        PaidAt = timeProvider.GetUtcNow().UtcDateTime;
-        SetUpdated(timeProvider.GetUtcNow(), updatedByUserId);
+        RaiseDomainEvent(new NotificationReadDomainEvent(Id.Value, UserId));
+    }
 
-        RaiseDomainEvent(new InvoicePaidDomainEvent(Id.Value, paymentId, PaidAt.Value));
+    public void Archive(TimeProvider timeProvider)
+    {
+        IsArchived = true;
+        SetUpdated(timeProvider.GetUtcNow());
     }
 }
 ```
 
-### Gold Standard: Money Value Object
+### Gold Standard: EmailAddress Value Object
 
 ```csharp
-public sealed class Money : ValueObject
+public sealed partial class EmailAddress : ValueObject
 {
-    public decimal Amount { get; }
-    public string Currency { get; }
+    public string Value { get; }
 
-    public static Money Create(decimal amount, string currency)
+    private EmailAddress(string value)
     {
-        if (amount < 0)
-            throw new BusinessRuleException("Billing.InvalidMoney",
-                "Money amount cannot be negative");
-        if (string.IsNullOrWhiteSpace(currency) || currency.Length != 3)
-            throw new BusinessRuleException("Billing.InvalidMoney",
-                "Currency must be a 3-letter ISO code");
-        return new Money(amount, currency.ToUpperInvariant());
+        Value = value.ToLowerInvariant();
     }
 
-    public static Money operator +(Money left, Money right)
+    public static EmailAddress Create(string email)
     {
-        if (left.Currency != right.Currency)
-            throw new BusinessRuleException("Billing.InvalidMoney",
-                $"Cannot add money with different currencies: {left.Currency} and {right.Currency}");
-        return new Money(left.Amount + right.Amount, left.Currency);
+        if (string.IsNullOrWhiteSpace(email))
+            throw new InvalidEmailAddressException("Email address cannot be empty");
+
+        email = email.Trim();
+
+        if (!EmailRegex().IsMatch(email))
+            throw new InvalidEmailAddressException($"'{email}' is not a valid email address");
+
+        return new EmailAddress(email);
     }
 
     protected override IEnumerable<object?> GetEqualityComponents()
     {
-        yield return Amount;
-        yield return Currency;
+        yield return Value;
     }
+
+    public override string ToString() => Value;
+
+    public static implicit operator string(EmailAddress email) => email.Value;
+
+    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex EmailRegex();
 }
 ```
 
 ### Repository Interface (Application Layer)
 
 ```csharp
-public interface IInvoiceRepository
+public interface INotificationRepository
 {
-    Task<Invoice?> GetByIdAsync(InvoiceId id, CancellationToken cancellationToken = default);
-    Task<Invoice?> GetByIdWithLineItemsAsync(InvoiceId id, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<Invoice>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<Invoice>> GetAllAsync(int skip = 0, int take = 50, CancellationToken cancellationToken = default);
-    Task<int> CountAllAsync(CancellationToken cancellationToken = default);
-    Task<bool> ExistsByInvoiceNumberAsync(string invoiceNumber, CancellationToken cancellationToken = default);
-    void Add(Invoice invoice);
-    void Update(Invoice invoice);
-    void Remove(Invoice invoice);
+    void Add(Notification notification);
+    Task<Notification?> GetByIdAsync(NotificationId id, CancellationToken cancellationToken = default);
+    Task<PagedResult<Notification>> GetByUserIdPagedAsync(
+        Guid userId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<int> GetUnreadCountAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task MarkAllAsReadAsync(Guid userId, DateTime readAt, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 ```
@@ -370,7 +371,7 @@ public interface IInvoiceRepository
 | Layer separation | Excellent |
 | Dependency direction | Correct |
 | Module isolation | Strong |
-| Aggregate design (Billing) | Exemplary |
+| Aggregate design (Notifications) | Exemplary |
 | Command/Query pattern | Clean |
 | Repository pattern | Proper |
 
@@ -379,13 +380,13 @@ public interface IInvoiceRepository
 | Aspect | Status | Priority |
 |--------|--------|----------|
 | Domain Services layer | Missing | High |
-| Value Objects | Expanding (Billing, Notifications, Storage) | Low |
+| Value Objects | Expanding (Notifications, Storage) | Low |
 | Event dispatch visibility | Implicit | Low |
 
 ### Bottom Line
 
-**Use Billing as your template for traditional DDD modules.** For external system integrations, follow the Identity module's adapter pattern.
+**Use Notifications as your template for traditional DDD modules.** For external system integrations, follow the Identity module's adapter pattern.
 
 ---
 
-*This assessment covers the 7 core modules in the Wallow platform. Billing remains the gold standard for traditional DDD. Notifications demonstrates good Value Object adoption. Identity demonstrates the External Adapter pattern. Cross-cutting capabilities (Auditing, Background Jobs, Workflows) live in separate Shared.Infrastructure projects. See the [Module Creation Guide](module-creation.md) for step-by-step module creation instructions.*
+*This assessment covers the 7 core modules in the Wallow platform: Identity, Storage, Notifications, Announcements, Inquiries, ApiKeys, and Branding. Notifications is the gold standard for traditional DDD with strong Value Object adoption. Identity demonstrates the External Adapter pattern. Cross-cutting capabilities (Auditing, Background Jobs, Workflows) live in separate Shared.Infrastructure projects. See the [Module Creation Guide](module-creation.md) for step-by-step module creation instructions.*

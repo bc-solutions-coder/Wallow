@@ -90,8 +90,8 @@ The `ModuleEnricher` (at `src/Wallow.Api/Logging/ModuleEnricher.cs`) automatical
 
 This produces log output like:
 ```
-[14:32:15 INF] [Billing] Invoice INV-2026-001 created for tenant acme-corp
-[14:32:16 INF] [Notifications] Sending invoice notification to customer@example.com
+[14:32:15 INF] [Storage] File document.pdf uploaded for tenant acme-corp
+[14:32:16 INF] [Notifications] Sending upload notification to customer@example.com
 [14:32:17 INF] [Notifications] Push notification queued for user usr_abc123
 ```
 
@@ -105,11 +105,11 @@ Wallow uses the `[LoggerMessage]` source generator pattern for all logging. Neve
 
 ```csharp
 // Define as private partial void methods at the bottom of a partial class
-[LoggerMessage(Level = LogLevel.Information, Message = "Invoice {InvoiceId} created for tenant {TenantId}")]
-private partial void LogInvoiceCreated(Guid invoiceId, Guid tenantId);
+[LoggerMessage(Level = LogLevel.Information, Message = "File {FileId} uploaded for tenant {TenantId}")]
+private partial void LogFileUploaded(Guid fileId, Guid tenantId);
 
-[LoggerMessage(Level = LogLevel.Warning, Message = "Payment retry {Attempt} of {MaxAttempts} for invoice {InvoiceId}")]
-private partial void LogPaymentRetry(int attempt, int maxAttempts, Guid invoiceId);
+[LoggerMessage(Level = LogLevel.Warning, Message = "Upload retry {Attempt} of {MaxAttempts} for file {FileId}")]
+private partial void LogUploadRetry(int attempt, int maxAttempts, Guid fileId);
 ```
 
 ## OpenTelemetry Tracing
@@ -153,21 +153,21 @@ Use `Diagnostics.CreateActivitySource()` from `Wallow.Shared.Kernel` to create m
 using System.Diagnostics;
 using Wallow.Shared.Kernel;
 
-public class PaymentService
+public class NotificationDispatcher
 {
     private static readonly ActivitySource ActivitySource =
-        Diagnostics.CreateActivitySource("Billing"); // creates "Wallow.Billing"
+        Diagnostics.CreateActivitySource("Notifications"); // creates "Wallow.Notifications"
 
-    public async Task<PaymentResult> ProcessPaymentAsync(PaymentRequest request)
+    public async Task<DispatchResult> DispatchAsync(NotificationRequest request)
     {
-        using Activity? activity = ActivitySource.StartActivity("ProcessPayment");
-        activity?.SetTag("payment.amount", request.Amount);
-        activity?.SetTag("payment.currency", request.Currency);
+        using Activity? activity = ActivitySource.StartActivity("DispatchNotification");
+        activity?.SetTag("notification.channel", request.Channel);
+        activity?.SetTag("notification.recipient", request.RecipientId);
 
         try
         {
-            PaymentResult result = await _gateway.ChargeAsync(request);
-            activity?.SetTag("payment.status", result.Status);
+            DispatchResult result = await _sender.SendAsync(request);
+            activity?.SetTag("notification.status", result.Status);
             return result;
         }
         catch (Exception ex)
@@ -228,31 +228,31 @@ Create custom metrics:
 using System.Diagnostics.Metrics;
 using Wallow.Shared.Kernel;
 
-public class InvoiceService
+public class AnnouncementService
 {
-    private static readonly Counter<long> InvoicesCreated =
+    private static readonly Counter<long> AnnouncementsPublished =
         Diagnostics.Meter.CreateCounter<long>(
-            "wallow.invoices.created",
-            description: "Number of invoices created");
+            "wallow.announcements.published_total",
+            description: "Number of announcements published");
 
-    private static readonly Histogram<double> InvoiceTotal =
+    private static readonly Histogram<double> AnnouncementReach =
         Diagnostics.Meter.CreateHistogram<double>(
-            "wallow.invoices.total",
-            unit: "USD",
-            description: "Invoice total amounts");
+            "wallow.announcements.reach",
+            unit: "{recipients}",
+            description: "Number of recipients per announcement");
 
-    public async Task<Invoice> CreateInvoiceAsync(CreateInvoiceCommand command)
+    public async Task<Announcement> PublishAnnouncementAsync(PublishAnnouncementCommand command)
     {
-        var invoice = // ... create invoice
+        Announcement announcement = // ... create announcement
 
-        InvoicesCreated.Add(1,
+        AnnouncementsPublished.Add(1,
             new KeyValuePair<string, object?>("tenant", command.TenantId),
-            new KeyValuePair<string, object?>("currency", command.Currency));
+            new KeyValuePair<string, object?>("category", command.Category));
 
-        InvoiceTotal.Record(invoice.Total,
+        AnnouncementReach.Record(announcement.RecipientCount,
             new KeyValuePair<string, object?>("tenant", command.TenantId));
 
-        return invoice;
+        return announcement;
     }
 }
 ```
@@ -301,9 +301,6 @@ Wallow includes pre-configured dashboards in `docker/grafana/dashboards/`:
 | **ASP.NET Core OTel** | HTTP request metrics, latencies, error rates |
 | **.NET Runtime** | GC metrics, thread pool, memory usage |
 | **Module Overview** | Per-module metrics overview |
-| **Billing Dashboard** | Billing-specific metrics |
-| **Messaging Dashboard** | Message processing metrics |
-| **Sales Dashboard** | Sales-related metrics |
 | **SLO Monitoring** | Service level objective tracking |
 | **Multi-Region Overview** | Cross-region metrics |
 
@@ -328,8 +325,8 @@ Example TraceQL query:
 2. Use LogQL queries:
 
 ```logql
-# All logs from Billing module
-{service_name="Wallow"} | json | Module="Billing"
+# All logs from Storage module
+{service_name="Wallow"} | json | Module="Storage"
 
 # Errors only
 {service_name="Wallow"} |= "error" or |= "Error"
@@ -416,7 +413,7 @@ Wolverine messages carry trace context automatically. To trace a message:
 
 Add custom telemetry for:
 
-- **Business-critical operations**: Payment processing, order completion
+- **Business-critical operations**: Inquiry submission, announcement publishing
 - **External integrations**: Third-party API calls, webhook processing
 - **Long-running operations**: Batch processing, data migrations
 - **Resource-intensive operations**: Report generation, file processing
@@ -426,7 +423,7 @@ Add custom telemetry for:
 **Activity Sources (Tracing):**
 ```csharp
 // Use Diagnostics.CreateActivitySource() — produces "Wallow.{ModuleName}"
-private static readonly ActivitySource ActivitySource = Diagnostics.CreateActivitySource("Billing");
+private static readonly ActivitySource ActivitySource = Diagnostics.CreateActivitySource("Notifications");
 private static readonly ActivitySource ActivitySource = Diagnostics.CreateActivitySource("Storage");
 ```
 
@@ -434,8 +431,8 @@ private static readonly ActivitySource ActivitySource = Diagnostics.CreateActivi
 ```csharp
 // Format: wallow.{module}.{metric_name}
 // Use snake_case, be descriptive
-Diagnostics.Meter.CreateCounter<long>("wallow.billing.invoices_created");
-Diagnostics.Meter.CreateHistogram<double>("wallow.billing.payment_duration_seconds");
+Diagnostics.Meter.CreateCounter<long>("wallow.notifications.dispatched_total");
+Diagnostics.Meter.CreateHistogram<double>("wallow.notifications.dispatch_duration_seconds");
 Diagnostics.Meter.CreateCounter<long>("wallow.storage.files_uploaded");
 ```
 
@@ -457,35 +454,35 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Wallow.Shared.Kernel;
 
-public sealed partial class PaymentService(
-    ILogger<PaymentService> logger,
-    IPaymentRepository repository)
+public sealed partial class NotificationDispatchService(
+    ILogger<NotificationDispatchService> logger,
+    INotificationRepository repository)
 {
     private static readonly ActivitySource ActivitySource =
-        Diagnostics.CreateActivitySource("Billing");
+        Diagnostics.CreateActivitySource("Notifications");
 
-    private static readonly Counter<long> PaymentsProcessed =
+    private static readonly Counter<long> NotificationsDispatched =
         Diagnostics.Meter.CreateCounter<long>(
-            "wallow.billing.payments_processed_total",
-            description: "Number of payments processed");
+            "wallow.notifications.dispatched_total",
+            description: "Number of notifications dispatched");
 
-    public async Task<PaymentResult> ProcessPaymentAsync(
-        PaymentRequest request, CancellationToken ct)
+    public async Task<DispatchResult> DispatchNotificationAsync(
+        NotificationRequest request, CancellationToken ct)
     {
-        using Activity? activity = ActivitySource.StartActivity("ProcessPayment");
-        activity?.SetTag("payment.invoice_id", request.InvoiceId.ToString());
-        activity?.SetTag("payment.amount", request.Amount);
+        using Activity? activity = ActivitySource.StartActivity("DispatchNotification");
+        activity?.SetTag("notification.recipient_id", request.RecipientId.ToString());
+        activity?.SetTag("notification.channel", request.Channel);
 
         try
         {
-            PaymentResult result = await repository.ProcessAsync(request, ct);
-            activity?.SetTag("payment.success", result.IsSuccess);
+            DispatchResult result = await repository.DispatchAsync(request, ct);
+            activity?.SetTag("notification.success", result.IsSuccess);
 
             if (result.IsSuccess)
             {
-                PaymentsProcessed.Add(1,
-                    new KeyValuePair<string, object?>("method", request.Method));
-                LogPaymentProcessed(result.PaymentId, request.InvoiceId);
+                NotificationsDispatched.Add(1,
+                    new KeyValuePair<string, object?>("channel", request.Channel));
+                LogNotificationDispatched(result.NotificationId, request.RecipientId);
             }
 
             return result;
@@ -494,16 +491,16 @@ public sealed partial class PaymentService(
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.RecordException(ex);
-            LogPaymentError(request.InvoiceId, ex);
+            LogNotificationError(request.RecipientId, ex);
             throw;
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Payment {PaymentId} processed for invoice {InvoiceId}")]
-    private partial void LogPaymentProcessed(Guid paymentId, Guid invoiceId);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Notification {NotificationId} dispatched to recipient {RecipientId}")]
+    private partial void LogNotificationDispatched(Guid notificationId, Guid recipientId);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Error processing payment for invoice {InvoiceId}")]
-    private partial void LogPaymentError(Guid invoiceId, Exception ex);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error dispatching notification for recipient {RecipientId}")]
+    private partial void LogNotificationError(Guid recipientId, Exception ex);
 }
 ```
 
@@ -558,8 +555,8 @@ Diagnostics.CreateActivitySource("MyModule")  // creates "Wallow.MyModule"
 
 | Type | Format | Example |
 |------|--------|---------|
-| **Metrics** | `wallow.{module}.{metric_name}` | `wallow.billing.invoices_created_total` |
-| **Activity Sources** | `Wallow.{Module}` | `Wallow.Billing` |
+| **Metrics** | `wallow.{module}.{metric_name}` | `wallow.notifications.dispatched_total` |
+| **Activity Sources** | `Wallow.{Module}` | `Wallow.Notifications` |
 
 Use snake_case for metric names. Append `_total` to counters and include a `unit` parameter on histograms where applicable.
 
@@ -568,21 +565,20 @@ Use snake_case for metric names. Append `_total` to counters and include a `unit
 Declare instruments as `static readonly` fields, then record values inside your handler:
 
 ```csharp
-// From Billing — InvoiceCreatedDomainEventHandler.cs
-private static readonly Counter<long> InvoicesCreatedCounter =
-    Diagnostics.Meter.CreateCounter<long>("wallow.billing.invoices_created_total");
+// From Notifications — NotificationSentDomainEventHandler.cs
+private static readonly Counter<long> NotificationsSentCounter =
+    Diagnostics.Meter.CreateCounter<long>("wallow.notifications.sent_total");
 
-private static readonly Histogram<double> InvoiceAmountHistogram =
-    Diagnostics.Meter.CreateHistogram<double>("wallow.billing.invoice_amount");
+private static readonly Histogram<double> NotificationLatencyHistogram =
+    Diagnostics.Meter.CreateHistogram<double>("wallow.notifications.dispatch_duration_seconds");
 
 // Inside the handler method:
-InvoicesCreatedCounter.Add(1,
-    new KeyValuePair<string, object?>("status", status),
-    new KeyValuePair<string, object?>("currency", currency));
+NotificationsSentCounter.Add(1,
+    new KeyValuePair<string, object?>("channel", channel),
+    new KeyValuePair<string, object?>("status", status));
 
-InvoiceAmountHistogram.Record((double)domainEvent.TotalAmount,
-    new KeyValuePair<string, object?>("status", status),
-    new KeyValuePair<string, object?>("currency", currency));
+NotificationLatencyHistogram.Record(dispatchDuration.TotalSeconds,
+    new KeyValuePair<string, object?>("channel", channel));
 ```
 
 ```csharp
@@ -627,14 +623,14 @@ With metrics flowing to Prometheus, create dashboard panels using PromQL:
 
 | Panel | PromQL |
 |-------|--------|
-| Invoices created (rate) | `rate(wallow_billing_invoices_created_total[5m])` |
-| Invoice amount P95 | `histogram_quantile(0.95, rate(wallow_billing_invoice_amount_bucket[5m]))` |
+| Notifications sent (rate) | `rate(wallow_notifications_sent_total[5m])` |
+| Dispatch latency P95 | `histogram_quantile(0.95, rate(wallow_notifications_dispatch_duration_seconds_bucket[5m]))` |
 | Files uploaded per minute | `rate(wallow_storage_files_uploaded_total[1m]) * 60` |
 | File size distribution | `histogram_quantile(0.5, rate(wallow_storage_file_size_bytes_bucket[5m]))` |
 
-> **Note:** Prometheus converts dots to underscores, so `wallow.billing.invoices_created_total` becomes `wallow_billing_invoices_created_total`.
+> **Note:** Prometheus converts dots to underscores, so `wallow.notifications.sent_total` becomes `wallow_notifications_sent_total`.
 
-> **Current modules:** Identity, Billing, Storage, Notifications, Messaging, Announcements, Inquiries, ApiKeys, Branding. Use these module names in your metrics and traces.
+> **Current modules:** Identity, Storage, Notifications, Announcements, Inquiries, ApiKeys, Branding. Use these module names in your metrics and traces.
 
 To add a panel: **Grafana** > **Dashboards** > **New Dashboard** > **Add visualization** > select **Prometheus** data source > enter the PromQL query > choose an appropriate visualization (Stat for counters, Time Series for rates, Heatmap for histograms).
 

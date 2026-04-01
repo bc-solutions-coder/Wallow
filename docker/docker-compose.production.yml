@@ -178,6 +178,11 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-wallow}-alloy
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:12345/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - wallow
     restart: unless-stopped
@@ -288,6 +293,10 @@ services:
       Authentication__CookieDomain: ${COOKIE_DOMAIN:-wallow.dev}
       # CORS (single origin — all services share wallow.dev)
       Cors__AllowedOrigins__0: ${WEB_PUBLIC_URL:-https://wallow.dev}
+      # OpenTelemetry (active only when --profile observability is used;
+      # Alloy listens on the Docker network, no port mapping needed)
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4317
+      OTEL_SERVICE_NAME: wallow-api
       # Identity / JWT
       Identity__SigningKey: ${IDENTITY_SIGNING_KEY}
       # Admin bootstrap (applied on first startup, no-op after)
@@ -406,6 +415,9 @@ services:
       ServiceUrls__ApiUrl: http://wallow-api:8080
       ServiceUrls__WebUrl: ${WEB_PUBLIC_URL:-https://wallow.dev}
       ConnectionStrings__Redis: "valkey:6379,password=${VALKEY_PASSWORD},abortConnect=false"
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4317
+      OTEL_SERVICE_NAME: wallow-auth
     depends_on:
       wallow-api:
         condition: service_healthy
@@ -453,10 +465,16 @@ services:
       # Public-facing auth URL (for browser redirects)
       ServiceUrls__AuthPublicUrl: ${AUTH_PUBLIC_URL:-https://wallow.dev/auth}
       # OIDC config
+      # Authority = public URL (must match issuer in tokens for validation)
+      # MetadataAddress = container-to-container URL for OIDC discovery (avoids hairpin through reverse proxy)
       Oidc__Authority: ${API_PUBLIC_URL:-https://wallow.dev/api}
+      Oidc__MetadataAddress: http://wallow-api:8080/.well-known/openid-configuration
       Oidc__ClientId: ${OIDC_CLIENT_ID}
       Oidc__ClientSecret: ${OIDC_CLIENT_SECRET}
       ConnectionStrings__Redis: "valkey:6379,password=${VALKEY_PASSWORD},abortConnect=false"
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4317
+      OTEL_SERVICE_NAME: wallow-web
     depends_on:
       wallow-api:
         condition: service_healthy

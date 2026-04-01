@@ -2,9 +2,8 @@
 FROM node:22-alpine AS theme
 WORKDIR /build
 COPY branding.json scripts/generate-docs-theme.mjs ./
-RUN mkdir -p templates/wallow/public && \
-    node generate-docs-theme.mjs && \
-    mv templates/wallow/public/main.css /main.css
+RUN node generate-docs-theme.mjs && \
+    mv docfx/templates/wallow/public/main.css /main.css
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /build

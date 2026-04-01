@@ -1,14 +1,15 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    if: ${{ !startsWith(github.head_ref || '', 'release-please--') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -478,93 +479,3 @@ jobs:
           name: coverage-report
           path: ./coverage/merged
           retention-days: 30
-
-  push-images:
-    needs: [merge-coverage, e2e, docker-images-app, docker-images-infra]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Restore app images
-        uses: actions/cache/restore@v5
-        with:
-          path: /tmp/wallow-images-app.tar.gz
-          key: images-app-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Restore infra images
-        uses: actions/cache/restore@v5
-        with:
-          path: /tmp/wallow-images-infra.tar.gz
-          key: images-infra-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Load container images
-        run: |
-          docker load < /tmp/wallow-images-app.tar.gz
-          docker load < /tmp/wallow-images-infra.tar.gz
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up QEMU for multi-arch builds
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Tag and push images to GHCR
-        env:
-          IMAGE_BASE: ghcr.io/${{ github.repository }}
-          SHA_TAG: ${{ github.sha }}
-        run: |
-          SHORT_SHA="${SHA_TAG:0:7}"
-
-          # App images: push arch-specific tags then create multi-arch manifests
-          declare -A APP_IMAGE_MAP=(
-            ["wallow-api"]="${IMAGE_BASE}"
-            ["wallow-auth"]="${IMAGE_BASE}-auth"
-            ["wallow-web"]="${IMAGE_BASE}-web"
-            ["wallow-migrations"]="${IMAGE_BASE}-migrations"
-          )
-          for local_name in "${!APP_IMAGE_MAP[@]}"; do
-            remote="${APP_IMAGE_MAP[$local_name]}"
-
-            # Push x64 (tagged :test) and arm64 (tagged :test-arm64)
-            docker tag "${local_name}:test" "${remote}:${SHORT_SHA}-amd64"
-            docker push "${remote}:${SHORT_SHA}-amd64"
-            docker tag "${local_name}:test-arm64" "${remote}:${SHORT_SHA}-arm64"
-            docker push "${remote}:${SHORT_SHA}-arm64"
-
-            # Create and push multi-arch manifests
-            for tag in latest "${SHORT_SHA}"; do
-              docker manifest create "${remote}:${tag}" \
-                "${remote}:${SHORT_SHA}-amd64" \
-                "${remote}:${SHORT_SHA}-arm64"
-              docker manifest push "${remote}:${tag}"
-            done
-
-            echo "Pushed multi-arch ${remote}:latest and ${remote}:${SHORT_SHA}"
-          done
-
-          # Infra images: multi-arch build + push via buildx
-          docker buildx build --platform linux/amd64,linux/arm64 \
-            --tag "${IMAGE_BASE}-garage:latest" \
-            --tag "${IMAGE_BASE}-garage:${SHORT_SHA}" \
-            --push docker/images/garage
-
-          docker buildx build --platform linux/amd64,linux/arm64 \
-            --tag "${IMAGE_BASE}-postgres-replica:latest" \
-            --tag "${IMAGE_BASE}-postgres-replica:${SHORT_SHA}" \
-            --push docker/images/postgres-replica
-
-          echo "Pushed multi-arch infra images (garage, postgres-replica)"

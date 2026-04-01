@@ -21,7 +21,7 @@ namespace Wallow.Notifications.Api.Controllers;
 [Authorize]
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/admin/push/config")]
+[Route("v{version:apiVersion}/admin/push/config")]
 [Tags("Admin - Push Configuration")]
 [Produces("application/json")]
 [IgnoreAntiforgeryToken]

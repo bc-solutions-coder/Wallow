@@ -10,7 +10,7 @@ namespace Wallow.Identity.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/identity/test")]
+[Route("v{version:apiVersion}/identity/test")]
 [Authorize]
 [Tags("Test Support")]
 [Produces("application/json")]

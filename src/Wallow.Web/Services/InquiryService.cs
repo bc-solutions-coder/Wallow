@@ -6,7 +6,7 @@ public sealed class InquiryService(
     IHttpClientFactory httpClientFactory,
     TokenProvider tokenProvider) : IInquiryService
 {
-    private const string BasePath = "api/v1/inquiries";
+    private const string BasePath = "v1/inquiries";
 
     private HttpClient CreateAuthenticatedClient()
     {

@@ -19,7 +19,7 @@ namespace Wallow.Announcements.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/admin/announcements")]
+[Route("v{version:apiVersion}/admin/announcements")]
 [HasPermission(PermissionType.AnnouncementManage)]
 [Tags("Admin - Announcements")]
 [Produces("application/json")]
@@ -63,7 +63,7 @@ public class AdminAnnouncementsController(IMessageBus bus, IHtmlSanitizationServ
             ct);
 
         return result.Map(MapToResponse)
-            .ToCreatedResult("/api/v1/admin/announcements");
+            .ToCreatedResult("/v1/admin/announcements");
     }
 
     [HttpPut("{id:guid}")]

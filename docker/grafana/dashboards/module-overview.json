@@ -85,7 +85,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "editorMode": "code",
-          "expr": "sum by (module) (\n  label_replace(\n    rate(http_server_request_duration_seconds_count[5m]),\n    \"module\", \"$1\", \"http_route\", \"/api/([^/]+)/.*\"\n  )\n)",
+          "expr": "sum by (module) (\n  label_replace(\n    rate(http_server_request_duration_seconds_count[5m]),\n    \"module\", \"$1\", \"http_route\", \"/v[0-9]+/([^/]+)/.*\"\n  )\n)",
           "legendFormat": "{{module}}",
           "refId": "A"
         }
@@ -144,7 +144,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "editorMode": "code",
-          "expr": "sum by (module) (\n  label_replace(\n    rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m]),\n    \"module\", \"$1\", \"http_route\", \"/api/([^/]+)/.*\"\n  )\n)",
+          "expr": "sum by (module) (\n  label_replace(\n    rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m]),\n    \"module\", \"$1\", \"http_route\", \"/v[0-9]+/([^/]+)/.*\"\n  )\n)",
           "legendFormat": "{{module}}",
           "refId": "A"
         }
@@ -210,7 +210,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95,\n  sum by (module, le) (\n    label_replace(\n      rate(http_server_request_duration_seconds_bucket[5m]),\n      \"module\", \"$1\", \"http_route\", \"/api/([^/]+)/.*\"\n    )\n  )\n)",
+          "expr": "histogram_quantile(0.95,\n  sum by (module, le) (\n    label_replace(\n      rate(http_server_request_duration_seconds_bucket[5m]),\n      \"module\", \"$1\", \"http_route\", \"/v[0-9]+/([^/]+)/.*\"\n    )\n  )\n)",
           "legendFormat": "{{module}}",
           "refId": "A"
         }

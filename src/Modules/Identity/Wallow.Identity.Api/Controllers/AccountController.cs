@@ -27,7 +27,7 @@ namespace Wallow.Identity.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/identity/auth")]
+[Route("v{version:apiVersion}/identity/auth")]
 [EnableRateLimiting("auth")]
 [IgnoreAntiforgeryToken]
 public sealed partial class AccountController(

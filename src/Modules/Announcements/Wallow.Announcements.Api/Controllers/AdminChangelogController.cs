@@ -15,7 +15,7 @@ namespace Wallow.Announcements.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/admin/changelog")]
+[Route("v{version:apiVersion}/admin/changelog")]
 [HasPermission(PermissionType.ChangelogManage)]
 [Tags("Admin - Changelog")]
 [Produces("application/json")]
@@ -39,7 +39,7 @@ public class AdminChangelogController(IMessageBus bus, IHtmlSanitizationService 
             ct);
 
         return result.Map(MapToResponse)
-            .ToCreatedResult("/api/v1/admin/changelog");
+            .ToCreatedResult("/v1/admin/changelog");
     }
 
     [HttpPost("{id:guid}/publish")]

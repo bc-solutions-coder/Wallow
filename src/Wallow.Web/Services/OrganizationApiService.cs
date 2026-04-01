@@ -6,8 +6,8 @@ public sealed class OrganizationApiService(
     IHttpClientFactory httpClientFactory,
     TokenProvider tokenProvider) : IOrganizationApiService
 {
-    private const string OrganizationsPath = "api/v1/identity/organizations";
-    private const string ClientsPath = "api/v1/identity/clients";
+    private const string OrganizationsPath = "v1/identity/organizations";
+    private const string ClientsPath = "v1/identity/clients";
 
     private HttpClient CreateAuthenticatedClient()
     {

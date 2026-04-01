@@ -38,8 +38,19 @@ fi
 KEY_NAME="${GARAGE_KEY_NAME:-wallow-dev}"
 ACCESS_KEY="${GARAGE_ACCESS_KEY:-}"
 SECRET_KEY="${GARAGE_SECRET_KEY:-}"
-KEY_EXISTS=$(garage key info "$KEY_NAME" 2>/dev/null || true)
-if [ -z "$KEY_EXISTS" ]; then
+KEY_INFO=$(garage key info "$KEY_NAME" 2>/dev/null || true)
+
+if [ -n "$KEY_INFO" ] && [ -n "$ACCESS_KEY" ]; then
+    # Key exists — verify it matches the expected access key
+    EXISTING_ID=$(echo "$KEY_INFO" | grep "Key ID:" | awk '{print $NF}')
+    if [ "$EXISTING_ID" != "$ACCESS_KEY" ]; then
+        echo "Key '$KEY_NAME' exists with ID '$EXISTING_ID' but expected '$ACCESS_KEY'. Deleting and reimporting..."
+        garage key delete --yes "$KEY_NAME"
+        KEY_INFO=""
+    fi
+fi
+
+if [ -z "$KEY_INFO" ]; then
     if [ -n "$ACCESS_KEY" ] && [ -n "$SECRET_KEY" ]; then
         echo "Importing access key '$KEY_NAME' with provided credentials..."
         garage key import -n "$KEY_NAME" --yes "$ACCESS_KEY" "$SECRET_KEY"
@@ -55,7 +66,7 @@ if [ -z "$KEY_EXISTS" ]; then
     echo "GARAGE_SECRET_KEY=$SECRET_KEY" >> /var/lib/garage/credentials
     echo "Credentials written to /var/lib/garage/credentials"
 else
-    echo "Key '$KEY_NAME' already exists, skipping."
+    echo "Key '$KEY_NAME' already exists with correct ID, skipping."
 fi
 
 # Create bucket if it doesn't exist

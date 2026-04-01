@@ -98,7 +98,7 @@
         }
 
         string encodedReturnUrl = Uri.EscapeDataString(ReturnUrl ?? "/");
-        string completeUrl = $"{ApiBaseUrl}/api/v1/identity/auth/complete-external-registration?acceptedTerms=true&returnUrl={encodedReturnUrl}";
+        string completeUrl = $"{ApiBaseUrl}/v1/identity/auth/complete-external-registration?acceptedTerms=true&returnUrl={encodedReturnUrl}";
 
         Navigation.NavigateTo(completeUrl, forceLoad: true);
     }

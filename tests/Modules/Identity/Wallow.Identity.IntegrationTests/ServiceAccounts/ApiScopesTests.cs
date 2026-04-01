@@ -19,7 +19,7 @@ public class ApiScopesTests(ServiceAccountTestFactory factory) : ServiceAccountI
     [Fact]
     public async Task Should_List_Scopes_Via_API()
     {
-        HttpResponseMessage response = await Client.GetAsync("/api/identity/scopes");
+        HttpResponseMessage response = await Client.GetAsync("/identity/scopes");
 
         response.IsSuccessStatusCode.Should().BeTrue();
         List<ApiScopeDto>? scopes = await response.Content.ReadFromJsonAsync<List<ApiScopeDto>>();
@@ -55,7 +55,7 @@ public class ApiScopesTests(ServiceAccountTestFactory factory) : ServiceAccountI
             return;
         }
 
-        HttpResponseMessage response = await Client.GetAsync($"/api/identity/scopes?category={firstCategory}");
+        HttpResponseMessage response = await Client.GetAsync($"/identity/scopes?category={firstCategory}");
 
         response.IsSuccessStatusCode.Should().BeTrue();
         List<ApiScopeDto>? scopes = await response.Content.ReadFromJsonAsync<List<ApiScopeDto>>();

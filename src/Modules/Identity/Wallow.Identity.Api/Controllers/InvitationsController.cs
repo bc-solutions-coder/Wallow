@@ -14,7 +14,7 @@ namespace Wallow.Identity.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/identity/invitations")]
+[Route("v{version:apiVersion}/identity/invitations")]
 [Tags("Invitations")]
 [Produces("application/json")]
 [Consumes("application/json")]

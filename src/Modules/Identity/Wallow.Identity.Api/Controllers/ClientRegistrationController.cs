@@ -16,7 +16,7 @@ namespace Wallow.Identity.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/identity/register")]
+[Route("v{version:apiVersion}/identity/register")]
 [AllowAnonymous]
 [Tags("Client Registration")]
 [Produces("application/json")]

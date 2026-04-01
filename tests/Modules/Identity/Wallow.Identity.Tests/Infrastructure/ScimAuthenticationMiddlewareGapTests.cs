@@ -77,7 +77,7 @@ public sealed class ScimAuthenticationMiddlewareGapTests : IDisposable
     public async Task InvokeAsync_NonScimPath_DoesNotSetTenantContext()
     {
         DefaultHttpContext context = new DefaultHttpContext();
-        context.Request.Path = "/api/v1/users";
+        context.Request.Path = "/v1/users";
         bool nextCalled = false;
 
         ScimAuthenticationMiddleware middleware = new(_ =>

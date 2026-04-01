@@ -5,7 +5,7 @@ namespace Wallow.Auth.Services;
 
 public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCookieJar? cookieJar = null) : IAuthApiClient
 {
-    private const string BasePath = "api/v1/identity/auth";
+    private const string BasePath = "v1/identity/auth";
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
@@ -128,7 +128,7 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
             HttpClient client = httpClientFactory.CreateClient("AuthApi");
             string encodedEmail = Uri.EscapeDataString(email);
             HttpResponseMessage response = await client.GetAsync(
-                $"api/v1/identity/organization-domains/match?email={encodedEmail}", ct);
+                $"v1/identity/organization-domains/match?email={encodedEmail}", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -151,7 +151,7 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
         {
             HttpClient client = httpClientFactory.CreateClient("AuthApi");
             HttpResponseMessage response = await client.PostAsJsonAsync(
-                "api/v1/identity/membership-requests", new { EmailDomain = emailDomain }, ct);
+                "v1/identity/membership-requests", new { EmailDomain = emailDomain }, ct);
 
             return response.IsSuccessStatusCode;
         }
@@ -299,7 +299,7 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
         HttpClient client = httpClientFactory.CreateClient("AuthApi");
         string encodedToken = Uri.EscapeDataString(token);
         HttpResponseMessage response = await client.GetAsync(
-            $"api/v1/identity/invitations/verify/{encodedToken}", ct);
+            $"v1/identity/invitations/verify/{encodedToken}", ct);
 
         if (response.IsSuccessStatusCode)
         {
@@ -316,7 +316,7 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
         HttpClient client = httpClientFactory.CreateClient("AuthApi");
         string encodedToken = Uri.EscapeDataString(token);
         HttpResponseMessage response = await client.PostAsync(
-            $"api/v1/identity/invitations/{encodedToken}/accept", null, ct);
+            $"v1/identity/invitations/{encodedToken}/accept", null, ct);
 
         return response.IsSuccessStatusCode;
     }
@@ -327,7 +327,7 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
 
         // Inject cookies from the circuit-scoped jar directly on the request.
         // See ConfirmEnrollmentAsync for why this is necessary.
-        using HttpRequestMessage request = new(HttpMethod.Post, "api/v1/identity/mfa/enroll/totp");
+        using HttpRequestMessage request = new(HttpMethod.Post, "v1/identity/mfa/enroll/totp");
 
         string? cookies = cookieJar?.GetCookieHeader();
         if (!string.IsNullOrEmpty(cookies))
@@ -354,7 +354,7 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
         // a DIFFERENT ApiCookieJar instance than the Blazor circuit scope. During prerender
         // this is fine (HttpContext supplies cookies), but in the interactive phase the
         // handler's jar is empty. We compensate by setting the Cookie header here directly.
-        using HttpRequestMessage request = new(HttpMethod.Post, "api/v1/identity/mfa/enroll/confirm");
+        using HttpRequestMessage request = new(HttpMethod.Post, "v1/identity/mfa/enroll/confirm");
         request.Content = JsonContent.Create(new { secret, code });
 
         string? cookies = cookieJar?.GetCookieHeader();
@@ -389,7 +389,7 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
         HttpClient client = httpClientFactory.CreateClient("AuthApi");
         string encodedToken = Uri.EscapeDataString(token);
         HttpResponseMessage response = await client.PostAsync(
-            $"api/v1/identity/mfa/enroll/exchange-token?token={encodedToken}", null, ct);
+            $"v1/identity/mfa/enroll/exchange-token?token={encodedToken}", null, ct);
 
         return response.IsSuccessStatusCode;
     }
@@ -399,7 +399,7 @@ public sealed class AuthApiClient(IHttpClientFactory httpClientFactory, ApiCooki
         HttpClient client = httpClientFactory.CreateClient("AuthApi");
         string encodedClientId = Uri.EscapeDataString(clientId);
         string scopeQuery = string.Join("&", scopes.Select(s => $"scopes={Uri.EscapeDataString(s)}"));
-        string url = $"api/v1/identity/apps/consent-info/{encodedClientId}";
+        string url = $"v1/identity/apps/consent-info/{encodedClientId}";
         if (!string.IsNullOrEmpty(scopeQuery))
         {
             url = $"{url}?{scopeQuery}";

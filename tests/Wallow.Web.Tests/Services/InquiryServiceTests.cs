@@ -9,7 +9,7 @@ namespace Wallow.Web.Tests.Services;
 public sealed class InquiryServiceTests : IDisposable
 {
     private const string BaseUrl = "http://localhost:5000";
-    private const string BasePath = "api/v1/inquiries";
+    private const string BasePath = "v1/inquiries";
 
     private readonly MockHttpMessageHandler _mockHttp = new();
     private readonly InquiryService _sut;

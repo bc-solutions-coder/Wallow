@@ -16,7 +16,7 @@ namespace Wallow.Branding.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/identity/apps/{clientId}/branding")]
+[Route("v{version:apiVersion}/identity/apps/{clientId}/branding")]
 [Tags("Client Branding")]
 [Produces("application/json")]
 [IgnoreAntiforgeryToken]

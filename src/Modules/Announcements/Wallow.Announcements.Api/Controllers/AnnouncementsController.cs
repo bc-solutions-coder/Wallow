@@ -18,7 +18,7 @@ namespace Wallow.Announcements.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/announcements")]
+[Route("v{version:apiVersion}/announcements")]
 [Authorize]
 [Tags("Announcements")]
 [Produces("application/json")]

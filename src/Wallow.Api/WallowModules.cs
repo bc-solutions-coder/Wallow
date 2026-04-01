@@ -1,13 +1,22 @@
 // Infrastructure extensions - canonical source for module registration
+using Microsoft.EntityFrameworkCore;
 using Microsoft.FeatureManagement;
 using Wallow.Announcements.Infrastructure.Extensions;
+using Wallow.Announcements.Infrastructure.Persistence;
 using Wallow.ApiKeys.Infrastructure.Extensions;
+using Wallow.ApiKeys.Infrastructure.Persistence;
 using Wallow.Branding.Infrastructure.Extensions;
+using Wallow.Branding.Infrastructure.Persistence;
 using Wallow.Identity.Infrastructure.Extensions;
+using Wallow.Identity.Infrastructure.Persistence;
 using Wallow.Inquiries.Infrastructure.Extensions;
+using Wallow.Inquiries.Infrastructure.Persistence;
 using Wallow.Notifications.Infrastructure.Extensions;
+using Wallow.Notifications.Infrastructure.Persistence;
+using Wallow.Shared.Infrastructure.Core.Auditing;
 using Wallow.Shared.Infrastructure.Plugins;
 using Wallow.Storage.Infrastructure.Extensions;
+using Wallow.Storage.Infrastructure.Persistence;
 
 namespace Wallow.Api;
 
@@ -83,9 +92,17 @@ internal static class WallowModules
     {
         IFeatureManager featureManager = app.Services.GetRequiredService<IFeatureManager>();
 
+        // In Testing environment, run EF Core migrations inline since the separate
+        // MigrationService (used in production/Aspire) is not available. The test factory
+        // spins up a fresh Postgres container with no schema.
+        if (app.Environment.IsEnvironment("Testing"))
+        {
+            await RunTestMigrationsAsync(app.Services);
+        }
+
         // ============================================================================
         // PLATFORM MODULES
-        // Core infrastructure services - runs DB migrations
+        // Core infrastructure services
         // ============================================================================
         // Identity is a required platform dependency — always initialized
         await app.InitializeIdentityModuleAsync();
@@ -129,5 +146,37 @@ internal static class WallowModules
         // Discover and optionally load plugins from configured directory
         // ============================================================================
         await app.InitializeWallowPluginsAsync();
+    }
+
+    private static async Task RunTestMigrationsAsync(IServiceProvider services)
+    {
+        await using AsyncServiceScope scope = services.CreateAsyncScope();
+        IServiceProvider sp = scope.ServiceProvider;
+
+        // Core contexts must be migrated first (Identity depends on its schema for seeding)
+        await sp.GetRequiredService<IdentityDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<AuditDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<AuthAuditDbContext>().Database.MigrateAsync();
+
+        // Feature module contexts — only migrate if the module is enabled (registered in DI)
+        List<Task> featureMigrations = [];
+        MigrateIfRegistered<BrandingDbContext>(sp, featureMigrations);
+        MigrateIfRegistered<NotificationsDbContext>(sp, featureMigrations);
+        MigrateIfRegistered<AnnouncementsDbContext>(sp, featureMigrations);
+        MigrateIfRegistered<StorageDbContext>(sp, featureMigrations);
+        MigrateIfRegistered<ApiKeysDbContext>(sp, featureMigrations);
+        MigrateIfRegistered<InquiriesDbContext>(sp, featureMigrations);
+
+        await Task.WhenAll(featureMigrations);
+    }
+
+    private static void MigrateIfRegistered<TContext>(IServiceProvider sp, List<Task> tasks)
+        where TContext : DbContext
+    {
+        TContext? context = sp.GetService<TContext>();
+        if (context is not null)
+        {
+            tasks.Add(context.Database.MigrateAsync());
+        }
     }
 }

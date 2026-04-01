@@ -29,7 +29,7 @@ namespace Wallow.Storage.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/storage")]
+[Route("v{version:apiVersion}/storage")]
 [Authorize]
 [Tags("Storage")]
 [Produces("application/json")]
@@ -75,7 +75,7 @@ public sealed class StorageController(IMessageBus bus, ITenantContext tenantCont
         Result<BucketDto> result = await bus.InvokeAsync<Result<BucketDto>>(command, cancellationToken);
 
         return result.Map(ToBucketResponse)
-            .ToCreatedResult($"/api/v1/storage/buckets/{request.Name}");
+            .ToCreatedResult($"/v1/storage/buckets/{request.Name}");
     }
 
     /// <summary>
@@ -175,7 +175,7 @@ public sealed class StorageController(IMessageBus bus, ITenantContext tenantCont
         }
 
         return result.Map(ToUploadResponse)
-            .ToCreatedResult($"/api/v1/storage/files/{result.Value.FileId}");
+            .ToCreatedResult($"/v1/storage/files/{result.Value.FileId}");
     }
 
     /// <summary>

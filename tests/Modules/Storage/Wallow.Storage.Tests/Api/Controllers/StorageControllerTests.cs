@@ -238,7 +238,7 @@ public class StorageControllerTests
         IActionResult result = await _controller.CreateBucket(request, CancellationToken.None);
 
         CreatedResult created = result.Should().BeOfType<CreatedResult>().Subject;
-        created.Location.Should().Be("/api/v1/storage/buckets/my-bucket");
+        created.Location.Should().Be("/v1/storage/buckets/my-bucket");
     }
 
     #endregion

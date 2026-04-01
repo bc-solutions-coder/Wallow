@@ -100,7 +100,10 @@ builder.Services.AddAuthentication(options =>
         options.Authority = builder.Configuration["Oidc:Authority"]
             ?? builder.Configuration["ServiceUrls:AuthUrl"]
             ?? "http://localhost:5001";
-        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        // When MetadataAddress is configured, discovery happens over the internal network (HTTP)
+        // while Authority remains HTTPS for browser-facing redirects — safe to skip HTTPS check.
+        bool hasInternalMetadata = !string.IsNullOrEmpty(builder.Configuration["Oidc:MetadataAddress"]);
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment() && !hasInternalMetadata;
 
         // When MetadataAddress differs from Authority (e.g. containers that can't reach the browser-facing
         // authority), fetch OIDC discovery from MetadataAddress but rewrite endpoint URLs to use Authority

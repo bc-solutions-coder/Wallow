@@ -309,7 +309,7 @@
     {
         string currentUrl = Navigation.Uri;
         string encodedReturnUrl = Uri.EscapeDataString(ReturnUrl ?? currentUrl);
-        return $"{ApiBaseUrl}/api/v1/identity/auth/external-login?provider={provider}&returnUrl={encodedReturnUrl}";
+        return $"{ApiBaseUrl}/v1/identity/auth/external-login?provider={provider}&returnUrl={encodedReturnUrl}";
     }
 
     private async Task HandleLogin()
@@ -528,7 +528,7 @@
             // endpoint so the browser has an auth cookie before hitting /connect/authorize.
             if (!string.IsNullOrEmpty(result.SignInTicket))
             {
-                string exchangeUrl = $"{ApiBaseUrl}/api/v1/identity/auth/exchange-ticket" +
+                string exchangeUrl = $"{ApiBaseUrl}/v1/identity/auth/exchange-ticket" +
                     $"?ticket={Uri.EscapeDataString(result.SignInTicket)}" +
                     $"&returnUrl={Uri.EscapeDataString(ReturnUrl)}";
                 Navigation.NavigateTo(exchangeUrl, forceLoad: true);

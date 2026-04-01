@@ -6,7 +6,7 @@ public sealed class MfaApiClient(
     IHttpClientFactory httpClientFactory,
     TokenProvider tokenProvider) : IMfaApiClient
 {
-    private const string MfaBasePath = "api/v1/identity/mfa";
+    private const string MfaBasePath = "v1/identity/mfa";
 
     private HttpClient CreateAuthenticatedClient()
     {

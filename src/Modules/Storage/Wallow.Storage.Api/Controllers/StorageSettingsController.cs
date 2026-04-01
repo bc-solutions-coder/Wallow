@@ -15,7 +15,7 @@ namespace Wallow.Storage.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/storage")]
+[Route("v{version:apiVersion}/storage")]
 [Authorize]
 [Tags("Storage Settings")]
 [Produces("application/json")]

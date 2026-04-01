@@ -28,7 +28,7 @@ public sealed class ClientBrandingApiClientTests : IDisposable
     [Fact]
     public async Task GetBrandingAsync_ValidClientId_ReturnsBrandingResponse()
     {
-        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/api/v1/identity/apps/test-client/branding")
+        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/v1/identity/apps/test-client/branding")
             .Respond("application/json",
                 """{"clientId":"test-client","displayName":"Test App","tagline":"A tagline","logoUrl":"https://example.com/logo.png","themeJson":"{\"primary\":\"#000\"}"}""");
 
@@ -45,7 +45,7 @@ public sealed class ClientBrandingApiClientTests : IDisposable
     [Fact]
     public async Task GetBrandingAsync_NotFound_ReturnsNull()
     {
-        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/api/v1/identity/apps/unknown-client/branding")
+        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/v1/identity/apps/unknown-client/branding")
             .Respond(HttpStatusCode.NotFound);
 
         ClientBrandingResponse? result = await _sut.GetBrandingAsync("unknown-client");
@@ -56,7 +56,7 @@ public sealed class ClientBrandingApiClientTests : IDisposable
     [Fact]
     public async Task GetBrandingAsync_ServerError_ReturnsNull()
     {
-        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/api/v1/identity/apps/error-client/branding")
+        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/v1/identity/apps/error-client/branding")
             .Respond(HttpStatusCode.InternalServerError);
 
         ClientBrandingResponse? result = await _sut.GetBrandingAsync("error-client");
@@ -67,7 +67,7 @@ public sealed class ClientBrandingApiClientTests : IDisposable
     [Fact]
     public async Task GetBrandingAsync_NullOptionalFields_ReturnsResponseWithNulls()
     {
-        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/api/v1/identity/apps/minimal-client/branding")
+        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/v1/identity/apps/minimal-client/branding")
             .Respond("application/json",
                 """{"clientId":"minimal-client","displayName":"Minimal","tagline":null,"logoUrl":null,"themeJson":null}""");
 
@@ -84,7 +84,7 @@ public sealed class ClientBrandingApiClientTests : IDisposable
     [Fact]
     public async Task GetBrandingAsync_ClientIdWithSpecialCharacters_EscapesInUrl()
     {
-        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/api/v1/identity/apps/client%20id%2Fslash/branding")
+        _mockHttp.When(HttpMethod.Get, "http://localhost:5000/v1/identity/apps/client%20id%2Fslash/branding")
             .Respond("application/json",
                 """{"clientId":"client id/slash","displayName":"Special","tagline":null,"logoUrl":null,"themeJson":null}""");
 

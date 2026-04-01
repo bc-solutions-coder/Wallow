@@ -196,10 +196,10 @@ public class ResultExtensionsTests
     {
         Result<string> result = Result.Success("value");
 
-        IActionResult actionResult = result.ToCreatedResult("/api/v1/storage/buckets/my-bucket");
+        IActionResult actionResult = result.ToCreatedResult("/v1/storage/buckets/my-bucket");
 
         CreatedResult created = actionResult.Should().BeOfType<CreatedResult>().Subject;
-        created.Location.Should().Be("/api/v1/storage/buckets/my-bucket");
+        created.Location.Should().Be("/v1/storage/buckets/my-bucket");
     }
 
     #endregion

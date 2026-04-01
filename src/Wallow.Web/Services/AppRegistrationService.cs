@@ -6,7 +6,7 @@ public sealed class AppRegistrationService(
     IHttpClientFactory httpClientFactory,
     TokenProvider tokenProvider) : IAppRegistrationService
 {
-    private const string BasePath = "api/v1/identity/apps";
+    private const string BasePath = "v1/identity/apps";
 
     private HttpClient CreateAuthenticatedClient()
     {

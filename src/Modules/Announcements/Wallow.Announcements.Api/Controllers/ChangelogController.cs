@@ -14,7 +14,7 @@ namespace Wallow.Announcements.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/changelog")]
+[Route("v{version:apiVersion}/changelog")]
 [AllowAnonymous]
 [Tags("Changelog")]
 [Produces("application/json")]

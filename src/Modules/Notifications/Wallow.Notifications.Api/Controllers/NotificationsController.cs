@@ -19,7 +19,7 @@ namespace Wallow.Notifications.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/notifications")]
+[Route("v{version:apiVersion}/notifications")]
 [Authorize]
 [Tags("Notifications")]
 [Produces("application/json")]

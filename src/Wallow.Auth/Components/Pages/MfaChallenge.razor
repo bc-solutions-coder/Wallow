@@ -144,7 +144,7 @@
 
                 if (!string.IsNullOrEmpty(safeReturnUrl) && !string.IsNullOrEmpty(result.SignInTicket))
                 {
-                    string exchangeUrl = $"{ApiBaseUrl}/api/v1/identity/auth/exchange-ticket" +
+                    string exchangeUrl = $"{ApiBaseUrl}/v1/identity/auth/exchange-ticket" +
                         $"?ticket={Uri.EscapeDataString(result.SignInTicket)}" +
                         $"&returnUrl={Uri.EscapeDataString(safeReturnUrl)}";
                     Navigation.NavigateTo(exchangeUrl, forceLoad: true);

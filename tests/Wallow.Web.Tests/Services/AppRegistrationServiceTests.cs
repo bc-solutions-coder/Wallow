@@ -9,7 +9,7 @@ namespace Wallow.Web.Tests.Services;
 public sealed class AppRegistrationServiceTests : IDisposable
 {
     private const string BaseUrl = "http://localhost:5000";
-    private const string BasePath = "api/v1/identity/apps";
+    private const string BasePath = "v1/identity/apps";
 
     private readonly MockHttpMessageHandler _mockHttp = new();
     private readonly AppRegistrationService _sut;

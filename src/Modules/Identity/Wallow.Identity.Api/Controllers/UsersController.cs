@@ -16,7 +16,7 @@ namespace Wallow.Identity.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/identity/users")]
+[Route("v{version:apiVersion}/identity/users")]
 [Authorize]
 [Tags("Users")]
 [Produces("application/json")]

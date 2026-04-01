@@ -91,7 +91,7 @@ public class AccountControllerExternalLoginTests
         };
 
         IUrlHelper urlHelper = Substitute.For<IUrlHelper>();
-        urlHelper.Action(Arg.Any<UrlActionContext>()).Returns("http://localhost:5000/api/v1/identity/auth/external-login-callback?returnUrl=http://localhost:5002");
+        urlHelper.Action(Arg.Any<UrlActionContext>()).Returns("http://localhost:5000/v1/identity/auth/external-login-callback?returnUrl=http://localhost:5002");
         _controller.Url = urlHelper;
     }
 

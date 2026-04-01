@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
 using Wallow.ServiceDefaults;
 
 namespace Wallow.Architecture.Tests;
@@ -40,31 +39,35 @@ public sealed class ServiceDefaultsTests : IDisposable
     }
 
     [Fact]
-    public void MapDefaultEndpoints_ShouldRegisterHealthEndpoint()
+    public void MapDefaultEndpoints_ShouldNotRegisterHealthEndpoint()
     {
-        EndpointDataSource endpointDataSource = _app.Services.GetRequiredService<EndpointDataSource>();
+        // Health checks are now mapped by each app's Program.cs with custom response writers,
+        // not by MapDefaultEndpoints.
+        List<string> routePatterns = GetRoutePatterns();
 
-        List<string> routePatterns = endpointDataSource.Endpoints
-            .OfType<RouteEndpoint>()
-            .Select(e => e.RoutePattern.RawText ?? string.Empty)
-            .ToList();
-
-        routePatterns.Should().Contain("/health",
-            "MapDefaultEndpoints should register a /health endpoint");
+        routePatterns.Should().NotContain(p => p.Contains("health"),
+            "MapDefaultEndpoints should not register /health — each app maps its own health endpoint");
     }
 
     [Fact]
     public void MapDefaultEndpoints_ShouldRegisterAliveEndpoint()
     {
-        EndpointDataSource endpointDataSource = _app.Services.GetRequiredService<EndpointDataSource>();
+        List<string> routePatterns = GetRoutePatterns();
 
-        List<string> routePatterns = endpointDataSource.Endpoints
+        routePatterns.Should().Contain(p => p.Contains("alive"),
+            "MapDefaultEndpoints should register an /alive endpoint via minimal API");
+    }
+
+    private List<string> GetRoutePatterns()
+    {
+        // Minimal API endpoints are registered on the app's own data sources,
+        // which are accessed via the IEndpointRouteBuilder interface.
+        IEndpointRouteBuilder routeBuilder = _app;
+        return routeBuilder.DataSources
+            .SelectMany(ds => ds.Endpoints)
             .OfType<RouteEndpoint>()
             .Select(e => e.RoutePattern.RawText ?? string.Empty)
             .ToList();
-
-        routePatterns.Should().Contain("/alive",
-            "MapDefaultEndpoints should register an /alive endpoint");
     }
 
     [Fact]

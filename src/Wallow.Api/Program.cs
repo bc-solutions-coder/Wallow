@@ -312,15 +312,6 @@ try
     builder.Services.AddControllersWithViews(options =>
     {
         options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
-
-        // When PathBase="/api" handles the /api prefix, strip it from route templates
-        // so controllers don't double-prefix (e.g. "api/v1/..." becomes "v1/...").
-        string? pathBase = builder.Configuration["PathBase"];
-        if (!string.IsNullOrEmpty(pathBase) &&
-            pathBase.TrimStart('/').Equals("api", StringComparison.OrdinalIgnoreCase))
-        {
-            options.Conventions.Add(new StripApiRoutePrefixConvention());
-        }
     });
     builder.Services.AddApiVersioning(opts =>
     {

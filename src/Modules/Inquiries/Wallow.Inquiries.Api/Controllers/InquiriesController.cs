@@ -25,7 +25,7 @@ namespace Wallow.Inquiries.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/inquiries")]
+[Route("v{version:apiVersion}/inquiries")]
 [Authorize]
 [Tags("Inquiries")]
 [Produces("application/json")]

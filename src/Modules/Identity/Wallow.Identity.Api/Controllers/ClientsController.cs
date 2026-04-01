@@ -17,7 +17,7 @@ namespace Wallow.Identity.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/identity/clients")]
+[Route("v{version:apiVersion}/identity/clients")]
 [Authorize]
 [HasPermission(PermissionType.AdminAccess)]
 [Tags("Clients")]

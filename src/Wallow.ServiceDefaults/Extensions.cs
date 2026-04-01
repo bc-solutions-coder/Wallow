@@ -29,15 +29,9 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        app.UseRouting();
-
-#pragma warning disable ASP0014 // UseEndpoints is required to register endpoints in the DI-visible EndpointDataSource
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapHealthChecks("/health");
-            endpoints.MapGet("/alive", () => Results.Ok("Alive"));
-        });
-#pragma warning restore ASP0014
+        // Health checks are mapped by each app's Program.cs with custom response writers
+        // and tag-based filtering. Only map the /alive liveness probe here.
+        app.MapGet("/alive", () => Results.Ok("Alive"));
 
         return app;
     }

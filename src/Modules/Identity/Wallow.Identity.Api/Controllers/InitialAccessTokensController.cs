@@ -14,7 +14,7 @@ namespace Wallow.Identity.Api.Controllers;
 
 [ApiController]
 [ApiVersion(1)]
-[Route("api/v{version:apiVersion}/identity/initial-access-tokens")]
+[Route("v{version:apiVersion}/identity/initial-access-tokens")]
 [Authorize]
 [HasPermission(PermissionType.AdminAccess)]
 [Tags("InitialAccessTokens")]

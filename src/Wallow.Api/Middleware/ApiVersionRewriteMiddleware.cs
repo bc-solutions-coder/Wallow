@@ -1,21 +1,38 @@
 namespace Wallow.Api.Middleware;
 
 /// <summary>
-/// Rewrites requests from /api/{path} to /api/v1/{path} when no version segment is present,
+/// Rewrites unversioned requests to include a /v1 prefix when no version segment is present,
 /// ensuring backward compatibility for clients that don't specify an API version.
+/// PathBase is expected to have already stripped the /api prefix.
 /// </summary>
 internal sealed class ApiVersionRewriteMiddleware(RequestDelegate next)
 {
+    private static readonly string[] _skipPrefixes =
+    [
+        "/connect/",
+        "/health",
+        "/hubs/",
+        "/events",
+        "/alive",
+        "/error",
+        "/asyncapi",
+        "/.well-known/",
+        "/scim/",
+        "/scalar/",
+        "/openapi/",
+        "/hangfire"
+    ];
+
     public Task InvokeAsync(HttpContext context)
     {
         string? path = context.Request.Path.Value;
 
-        if (path is not null
-            && path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase)
+        if (!string.IsNullOrEmpty(path)
+            && path.Length > 1
+            && !IsSkipListed(path)
             && !HasVersionSegment(path))
         {
-            // Rewrite /api/{rest} → /api/v1/{rest}
-            context.Request.Path = "/api/v1" + path[4..];
+            context.Request.Path = "/v1" + path;
         }
 
         return next(context);
@@ -23,10 +40,22 @@ internal sealed class ApiVersionRewriteMiddleware(RequestDelegate next)
 
     private static bool HasVersionSegment(string path)
     {
-        // Check for /api/v{digit} pattern (e.g., /api/v1/..., /api/v2/...)
-        return path.Length > 5
-            && (path[5] == 'v' || path[5] == 'V')
-            && path.Length > 6
-            && char.IsDigit(path[6]);
+        // Check for /v{digit} pattern at start (e.g., /v1/..., /v2/...)
+        return path.Length > 2
+            && (path[1] == 'v' || path[1] == 'V')
+            && char.IsDigit(path[2]);
+    }
+
+    private static bool IsSkipListed(string path)
+    {
+        foreach (string prefix in _skipPrefixes)
+        {
+            if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

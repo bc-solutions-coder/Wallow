@@ -9,7 +9,7 @@ namespace Wallow.Identity.IntegrationTests.OAuth2;
 [Trait("Category", "Integration")]
 public class DcrFlowTests(WallowApiFactory factory) : IdentityIntegrationTestBase(factory)
 {
-    private const string RegisterEndpoint = "/api/v1/identity/apps/register";
+    private const string RegisterEndpoint = "/v1/identity/apps/register";
     private const string TokenEndpoint = "/connect/token";
 
     [Fact]

@@ -9,8 +9,8 @@ namespace Wallow.Web.Tests.Services;
 public sealed class OrganizationApiServiceTests : IDisposable
 {
     private const string BaseUrl = "http://localhost:5000";
-    private const string OrganizationsPath = "api/v1/identity/organizations";
-    private const string ClientsPath = "api/v1/identity/clients";
+    private const string OrganizationsPath = "v1/identity/organizations";
+    private const string ClientsPath = "v1/identity/clients";
 
     private readonly MockHttpMessageHandler _mockHttp = new();
     private readonly OrganizationApiService _sut;

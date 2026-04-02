@@ -57,7 +57,16 @@ feature branch ──PR──► main branch ──release PR──► tag + Git
 1. **Feature branches** — Develop and PR into main. CI runs tests.
 2. **Merge to main** — release-please analyzes commits and creates/updates a **Release PR** with changelog and version bump.
 3. **Merge the Release PR** — release-please creates a git tag (`v0.2.0`) and GitHub Release.
-4. **Tag triggers publish** — The publish workflow (`publish.yml`) retags the `:latest` images with semver versions and scans with Trivy. Images are already built and pushed by CI on merge to main.
+4. **Tag triggers publish** — The publish workflow (`publish.yml`) promotes `:sha` images to `:latest` and semver tags, then scans with Trivy.
+
+### Docker Image Tag Tiers
+
+| Tag | Source | Stability |
+|-----|--------|-----------|
+| `:nightly` | Every merge to `main` | Bleeding edge — may be broken |
+| `:latest` | Release publish | Current stable release |
+| `:X.Y.Z` / `:X.Y` | Release publish | Pinned version |
+| `:sha` | `main` branch push | Specific commit (internal) |
 
 ### Example Sequence
 
@@ -92,7 +101,7 @@ release-please automatically updates `Directory.Build.props` with the new versio
 | Artifact | How | Example |
 |----------|-----|---------|
 | `Directory.Build.props` | Updated by release-please in the Release PR | `<Version>0.2.0</Version>` |
-| Docker image tags | CI pushes `:latest` and `:sha`; publish adds semver tags | `0.2.0`, `0.2`, `latest` |
+| Docker image tags | Deploy pushes `:nightly` and `:sha`; publish promotes to `:latest` and semver | `0.2.0`, `0.2`, `latest`, `nightly` |
 | Git tags | Created by release-please on Release PR merge | `v0.2.0` |
 | GitHub Releases | Created by release-please with auto-generated changelog | `v0.2.0` |
 

@@ -2,10 +2,15 @@
 #
 # This is the deploy step, not CI. No tests run here — they already passed
 # on the PR. This workflow builds container images and pushes them to the
-# registry with :latest and :sha tags.
+# registry with :nightly and :sha tags.
 #
 # Skips release-please merges (only version/changelog changes — no new images needed).
-# The publish workflow (publish.yml) retags :latest with semver on release.
+# The publish workflow (publish.yml) promotes :sha to :latest and semver on release.
+#
+# Tag tiers:
+#   :nightly       — latest main commit (may be broken)
+#   :latest        — current released version (set by publish.yml)
+#   :X.Y.Z / :X.Y — pinned semver versions (set by publish.yml)
 
 name: Deploy
 
@@ -256,24 +261,24 @@ jobs:
             docker tag "${local_name}:test-arm64" "${remote}:${SHORT_SHA}-arm64"
             docker push "${remote}:${SHORT_SHA}-arm64"
 
-            for tag in latest "${SHORT_SHA}"; do
+            for tag in nightly "${SHORT_SHA}"; do
               docker manifest create "${remote}:${tag}" \
                 "${remote}:${SHORT_SHA}-amd64" \
                 "${remote}:${SHORT_SHA}-arm64"
               docker manifest push "${remote}:${tag}"
             done
 
-            echo "Pushed multi-arch ${remote}:latest and ${remote}:${SHORT_SHA}"
+            echo "Pushed multi-arch ${remote}:nightly and ${remote}:${SHORT_SHA}"
           done
 
           docker buildx build --platform linux/amd64,linux/arm64 \
-            --tag "${IMAGE_BASE}-garage:latest" \
+            --tag "${IMAGE_BASE}-garage:nightly" \
             --tag "${IMAGE_BASE}-garage:${SHORT_SHA}" \
             --push docker/images/garage
 
           docker buildx build --platform linux/amd64,linux/arm64 \
-            --tag "${IMAGE_BASE}-postgres-replica:latest" \
+            --tag "${IMAGE_BASE}-postgres-replica:nightly" \
             --tag "${IMAGE_BASE}-postgres-replica:${SHORT_SHA}" \
             --push docker/images/postgres-replica
 
-          echo "Pushed multi-arch infra images (garage, postgres-replica)"
+          echo "Pushed multi-arch infra images (garage, postgres-replica) as :nightly and :${SHORT_SHA}"

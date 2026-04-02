@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.1](https://github.com/bc-solutions-coder/wallow/compare/v3.0.0...v3.0.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* **auth:** fix /auth redirect downloading file instead of navigating ([4fc8598](https://github.com/bc-solutions-coder/wallow/commit/4fc859809dca719b76d418ff20944ac36fb97f8f))
+* **web:** add data-enhance-nav=false to Get Started login links ([1f306ee](https://github.com/bc-solutions-coder/wallow/commit/1f306ee80244d84d32b88520c481592867fbdb74))
+
 ## [3.0.0](https://github.com/bc-solutions-coder/wallow/compare/v2.0.0...v3.0.0) (2026-04-01)
 
 

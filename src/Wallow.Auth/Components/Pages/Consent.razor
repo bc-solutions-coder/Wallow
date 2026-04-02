@@ -23,8 +23,8 @@ else
                 <div>@scope.Name</div>
             }
         </div>
-        <button data-testid="consent-approve" @onclick="Approve">Approve</button>
-        <button data-testid="consent-deny" @onclick="Deny">Deny</button>
+        <BbButton data-testid="consent-approve" OnClick="Approve" Class="w-full">Approve</BbButton>
+        <BbButton data-testid="consent-deny" Variant="ButtonVariant.Outline" OnClick="Deny" Class="w-full">Deny</BbButton>
     </div>
 }
 

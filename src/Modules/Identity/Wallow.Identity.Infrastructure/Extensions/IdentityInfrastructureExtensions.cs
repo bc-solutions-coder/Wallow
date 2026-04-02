@@ -119,10 +119,10 @@ public static class IdentityInfrastructureExtensions
                     .EnableEndSessionEndpointPassthrough()
                     .EnableUserInfoEndpointPassthrough();
 
-                if (!environment.IsProduction())
-                {
-                    aspNetCoreBuilder.DisableTransportSecurityRequirement();
-                }
+                // Kestrel is never exposed directly — TLS terminates at the reverse proxy
+                // (Cloudflare / Pangolin). Container-to-container calls (e.g. OIDC discovery
+                // from wallow-web) use plain HTTP, so the transport check must be off.
+                aspNetCoreBuilder.DisableTransportSecurityRequirement();
 
                 options.RegisterScopes(
                     "openid", "profile", "email", "roles", "offline_access",

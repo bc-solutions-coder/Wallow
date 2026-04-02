@@ -108,14 +108,10 @@ builder.Services.AddAuthentication(options =>
         // When MetadataAddress differs from Authority (e.g. containers that can't reach the browser-facing
         // authority), fetch OIDC discovery from MetadataAddress but rewrite endpoint URLs to use Authority
         // so browser redirects go to the same-site authority (avoids SameSite cookie issues).
-        // Container-to-container OIDC discovery uses plain HTTP, but OpenIddict on the API
-        // requires HTTPS (ID2083). The ForwardedHeaders middleware on the API trusts
-        // X-Forwarded-Proto, so we inject it on backchannel calls to satisfy OpenIddict.
         string? metadataAddress = builder.Configuration["Oidc:MetadataAddress"];
         if (!string.IsNullOrEmpty(metadataAddress))
         {
             options.MetadataAddress = metadataAddress;
-            options.BackchannelHttpHandler = new ForwardedProtoHandler();
             string authority = options.Authority!.TrimEnd('/');
 
             options.Events.OnRedirectToIdentityProvider = context =>

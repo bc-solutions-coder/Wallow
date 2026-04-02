@@ -177,7 +177,7 @@
     <!-- ======================================
          Blazor UI Components (BlazorBlueprint)
          ====================================== -->
-    <PackageVersion Include="BlazorBlueprint.Components" Version="3.9.2" />
+    <PackageVersion Include="BlazorBlueprint.Components" Version="3.9.3" />
     <PackageVersion Include="BlazorBlueprint.Icons.Lucide" Version="2.0.0" />
     <!-- ======================================
          Tailwind CSS (NuGet-based integration)

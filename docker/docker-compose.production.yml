@@ -238,6 +238,21 @@ services:
         max-file: "3"
 
   # ============================================
+  # WALLOW API — CERT VOLUME INIT
+  # ============================================
+  # Named volumes are created owned by root; the API container runs as non-root
+  # (UID 1654, the .NET 'app' user). This one-shot service sets ownership so the
+  # entrypoint can write OpenIddict certificates to the persistent volume.
+  api-cert-init:
+    image: busybox:1.37
+    volumes:
+      - api_certs:/certs
+    command: chown -R 1654:1654 /certs
+    restart: "no"
+    networks:
+      - wallow
+
+  # ============================================
   # WALLOW API
   # ============================================
   wallow-api:
@@ -362,6 +377,8 @@ services:
       PreRegisteredClients__Clients__1__Scopes__33: serviceaccounts.manage
       PreRegisteredClients__Clients__1__Scopes__34: webhooks.manage
     depends_on:
+      api-cert-init:
+        condition: service_completed_successfully
       wallow-migrations:
         condition: service_completed_successfully
       postgres:

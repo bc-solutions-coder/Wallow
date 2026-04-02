@@ -112,7 +112,7 @@
     <!-- ======================================
          Cloud Storage (AWS S3)
          ====================================== -->
-    <PackageVersion Include="AWSSDK.S3" Version="4.0.18.7" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.20.2" />
     <!-- ======================================
          Microsoft.Extensions.*
          ====================================== -->

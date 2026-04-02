@@ -4,6 +4,6 @@
 @code {
     protected override void OnInitialized()
     {
-        Navigation.NavigateTo("/login", replace: true);
+        Navigation.NavigateTo("login", forceLoad: true);
     }
 }

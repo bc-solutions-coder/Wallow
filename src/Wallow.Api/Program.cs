@@ -22,15 +22,10 @@ using Wallow.Api.Logging;
 using Wallow.Api.Middleware;
 using Wallow.Api.Services;
 using Wallow.ApiKeys.Infrastructure.Authorization;
-using Wallow.Identity.Application.Commands.BootstrapAdmin;
-using Wallow.Identity.Application.Queries.IsSetupRequired;
 using Wallow.Identity.Infrastructure.Authorization;
-using Wallow.Identity.Infrastructure.Data;
 using Wallow.Identity.Infrastructure.Jobs;
 using Wallow.Identity.Infrastructure.Middleware;
 using Wallow.Identity.Infrastructure.MultiTenancy;
-using Wallow.Identity.Infrastructure.Options;
-using Wallow.Identity.Infrastructure.Services;
 using Wallow.Notifications.Infrastructure.Jobs;
 using Wallow.ServiceDefaults;
 using Wallow.Shared.Contracts.Realtime;
@@ -354,67 +349,6 @@ try
     await app.InitializeAppAuditingAsync();
     await app.InitializeAuthAuditingAsync();
 
-    // Seed default roles, sync pre-registered OAuth2 clients, and bootstrap admin if configured
-    await using (AsyncServiceScope seedScope = app.Services.CreateAsyncScope())
-    {
-        IServiceProvider sp = seedScope.ServiceProvider;
-
-        // Seed default roles (admin, manager, user) — idempotent
-        DefaultRoleSeeder roleSeeder = sp.GetRequiredService<DefaultRoleSeeder>();
-        await roleSeeder.SeedAsync();
-
-        // Admin bootstrap priority chain: CLI args > appsettings config > skip
-        // Use services directly (not IMessageBus) because Wolverine hasn't started yet at this point
-        AdminBootstrapOptions configOptions = sp.GetRequiredService<IOptions<AdminBootstrapOptions>>().Value;
-        ISetupStatusChecker setupStatusChecker = sp.GetRequiredService<ISetupStatusChecker>();
-        bool setupRequired = await setupStatusChecker.IsSetupRequiredAsync();
-
-        if (setupRequired)
-        {
-            string? cliEmail = app.Configuration["AdminBootstrap:Email"];
-            string? cliPassword = app.Configuration["AdminBootstrap:Password"];
-            string? cliFirstName = app.Configuration["AdminBootstrap:FirstName"];
-            string? cliLastName = app.Configuration["AdminBootstrap:LastName"];
-
-            // CLI-supplied credentials take priority (e.g. --AdminBootstrap:Email=... on command line)
-            // then fall back to appsettings-bound AdminBootstrapOptions
-            BootstrapAdminCommand? bootstrapCommand = null;
-            if (!string.IsNullOrWhiteSpace(cliEmail) && !string.IsNullOrWhiteSpace(cliPassword))
-            {
-                bootstrapCommand = new BootstrapAdminCommand(
-                    cliEmail,
-                    cliPassword,
-                    cliFirstName ?? string.Empty,
-                    cliLastName ?? string.Empty);
-            }
-            else if (configOptions.IsConfigured)
-            {
-                bootstrapCommand = new BootstrapAdminCommand(
-                    configOptions.Email,
-                    configOptions.Password,
-                    configOptions.FirstName,
-                    configOptions.LastName);
-            }
-
-            if (bootstrapCommand is not null)
-            {
-                IBootstrapAdminService bootstrapAdminService = sp.GetRequiredService<IBootstrapAdminService>();
-                await bootstrapAdminService.EnsureRoleExistsAsync("admin");
-                bool userExists = await bootstrapAdminService.UserExistsAsync(bootstrapCommand.Email);
-                if (!userExists)
-                {
-                    Guid userId = await bootstrapAdminService.CreateUserAsync(
-                        bootstrapCommand.Email,
-                        bootstrapCommand.Password,
-                        bootstrapCommand.FirstName,
-                        bootstrapCommand.LastName);
-                    await bootstrapAdminService.AssignRoleAsync(userId, "admin");
-                }
-            }
-        }
-
-    }
-
     // Middleware pipeline (order matters!)
 
     // Forwarded headers — must run before any middleware that inspects the request scheme.
@@ -702,12 +636,6 @@ try
                 devCredentialViolations.Add("Storage:S3:AccessKey uses default development key");
             }
 
-            string? adminEmail = app.Configuration["AdminBootstrap:Email"];
-            if (adminEmail is not null && adminEmail.EndsWith("@wallow.dev", StringComparison.OrdinalIgnoreCase))
-            {
-                devCredentialViolations.Add("AdminBootstrap:Email uses development domain (@wallow.dev)");
-            }
-
             if (devCredentialViolations.Count > 0)
             {
                 throw new InvalidOperationException(
@@ -725,15 +653,6 @@ try
     });
 
     await app.StartAsync();
-
-    // Sync pre-registered OAuth2 clients after host start (Wolverine requires a running host for IMessageBus)
-    // Auto-creates organizations from TenantName and seeds members from SeedMembers — all config-driven
-    await using (AsyncServiceScope postStartScope = app.Services.CreateAsyncScope())
-    {
-        IServiceProvider sp = postStartScope.ServiceProvider;
-        PreRegisteredClientSyncService clientSync = sp.GetRequiredService<PreRegisteredClientSyncService>();
-        await clientSync.SyncAsync(CancellationToken.None);
-    }
 
     await app.WaitForShutdownAsync();
 }

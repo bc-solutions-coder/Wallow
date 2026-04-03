@@ -11,7 +11,10 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
+using Wallow.Identity.Application.Commands.BootstrapAdmin;
 using Wallow.Identity.Application.Interfaces;
+using Wallow.Identity.Application.Queries.IsSetupRequired;
+using Wallow.Identity.Infrastructure.Data;
 using Wallow.Shared.Contracts.ApiKeys;
 using Wallow.Shared.Contracts.Identity;
 using Wallow.Shared.Kernel.Identity;
@@ -226,7 +229,60 @@ public class WallowApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             // Replace real query services that depend on external systems (raw DB, etc.)
             // with fakes so integration tests don't require those systems to be fully initialised.
             services.AddSingleton<IUserQueryService, FakeUserQueryService>();
+
+            // Seed roles and bootstrap admin at test startup so SetupMiddleware does not return 503.
+            // SeederService runs this in production; in tests we replicate it inline.
+            services.AddHostedService<TestSeedHostedService>();
         });
+    }
+
+    /// <summary>
+    /// Runs role seeding and admin bootstrap at test host startup so that
+    /// SetupMiddleware does not block requests with 503.
+    /// In production this is handled by the dedicated SeederService container.
+    /// </summary>
+    private sealed class TestSeedHostedService(
+        IServiceScopeFactory scopeFactory,
+        IConfiguration configuration) : IHostedService
+    {
+        public async Task StartAsync(CancellationToken cancellationToken)
+        {
+            await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+            IServiceProvider sp = scope.ServiceProvider;
+
+            DefaultRoleSeeder roleSeeder = sp.GetRequiredService<DefaultRoleSeeder>();
+            await roleSeeder.SeedAsync();
+
+            string? email = configuration["AdminBootstrap:Email"];
+            string? password = configuration["AdminBootstrap:Password"];
+            string? firstName = configuration["AdminBootstrap:FirstName"];
+            string? lastName = configuration["AdminBootstrap:LastName"];
+
+            if (!string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(password))
+            {
+                ISetupStatusChecker setupStatusChecker = sp.GetRequiredService<ISetupStatusChecker>();
+                bool setupRequired = await setupStatusChecker.IsSetupRequiredAsync(cancellationToken);
+
+                if (setupRequired)
+                {
+                    IBootstrapAdminService bootstrapAdminService = sp.GetRequiredService<IBootstrapAdminService>();
+                    await bootstrapAdminService.EnsureRoleExistsAsync("admin", cancellationToken);
+                    bool userExists = await bootstrapAdminService.UserExistsAsync(email, cancellationToken);
+                    if (!userExists)
+                    {
+                        Guid userId = await bootstrapAdminService.CreateUserAsync(
+                            email,
+                            password,
+                            firstName ?? string.Empty,
+                            lastName ?? string.Empty,
+                            cancellationToken);
+                        await bootstrapAdminService.AssignRoleAsync(userId, "admin", cancellationToken);
+                    }
+                }
+            }
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class FakeApiKeyService : IApiKeyService

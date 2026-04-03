@@ -25,6 +25,10 @@ CLAUDE.md
 .env
 *.local
 
+# Seed data (environment overrides contain real credentials)
+seed.*.json
+!seed.json
+
 # OS
 .DS_Store
 Thumbs.db

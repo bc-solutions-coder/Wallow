@@ -1,4 +1,3 @@
-#pragma warning disable CA1032 // Intentionally removing weak constructors to enforce structured exception creation
 
 namespace Wallow.Shared.Kernel.Domain;
 

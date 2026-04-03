@@ -1,5 +1,3 @@
-#pragma warning disable CA1032 // Test exception class intentionally omits parameterless constructor
-
 using Wallow.Shared.Kernel.Domain;
 
 namespace Wallow.Shared.Kernel.Tests.Domain;

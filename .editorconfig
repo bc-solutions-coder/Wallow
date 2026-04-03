@@ -195,6 +195,10 @@ dotnet_diagnostic.CA1030.severity = none
 # CA1031: Do not catch general exception types
 dotnet_diagnostic.CA1031.severity = silent
 
+# CA1032: Implement standard exception constructors
+# Disabled: All exceptions inherit DomainException which enforces structured creation
+dotnet_diagnostic.CA1032.severity = none
+
 # CA1054: URI parameters should not be strings
 # Disabled: DTOs and contracts use string URLs for serialization simplicity
 dotnet_diagnostic.CA1054.severity = none

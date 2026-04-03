@@ -111,6 +111,12 @@ if [[ "$SKIP_BUILD" == "false" ]]; then
         -p:ContainerImageTag=test \
         -p:ContainerRuntimeIdentifier="$RID"
 
+    echo "  Publishing wallow-seeder:test..."
+    dotnet publish "$REPO_ROOT/src/Wallow.SeederService/Wallow.SeederService.csproj" \
+        -c Release --no-build /t:PublishContainer \
+        -p:ContainerImageTag=test \
+        -p:ContainerRuntimeIdentifier="$RID"
+
     echo ""
     echo "=== Building infrastructure images ==="
     $COMPOSE_CMD build garage
@@ -153,6 +159,35 @@ done
 if [ $MIGRATION_ELAPSED -ge $MIGRATION_TIMEOUT ]; then
     echo "  ERROR: Timeout waiting for migrations after ${MIGRATION_TIMEOUT}s"
     $COMPOSE_CMD logs wallow-migrations
+    exit 1
+fi
+
+# ============================================
+# Step 3b: Wait for seeder to complete
+# ============================================
+echo ""
+echo "=== Waiting for seeder to complete ==="
+SEEDER_TIMEOUT=120
+SEEDER_ELAPSED=0
+while [ $SEEDER_ELAPSED -lt $SEEDER_TIMEOUT ]; do
+    STATUS=$($COMPOSE_CMD ps -a wallow-seeder --format '{{.State}}' 2>/dev/null)
+    if [ "$STATUS" = "exited" ]; then
+        EXIT_CODE=$($COMPOSE_CMD ps -a wallow-seeder --format '{{.ExitCode}}' 2>/dev/null)
+        if [ "$EXIT_CODE" = "0" ]; then
+            echo "  Seeder completed successfully (${SEEDER_ELAPSED}s)"
+            break
+        else
+            echo "  ERROR: Seeder service failed with exit code $EXIT_CODE"
+            $COMPOSE_CMD logs wallow-seeder
+            exit 1
+        fi
+    fi
+    sleep 2
+    SEEDER_ELAPSED=$((SEEDER_ELAPSED + 2))
+done
+if [ $SEEDER_ELAPSED -ge $SEEDER_TIMEOUT ]; then
+    echo "  ERROR: Timeout waiting for seeder after ${SEEDER_TIMEOUT}s"
+    $COMPOSE_CMD logs wallow-seeder
     exit 1
 fi
 

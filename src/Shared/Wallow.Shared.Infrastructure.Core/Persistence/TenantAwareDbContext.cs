@@ -9,10 +9,7 @@ namespace Wallow.Shared.Infrastructure.Core.Persistence;
 
 public abstract class TenantAwareDbContext<TContext> : DbContext, ITenantAwareContext where TContext : DbContext
 {
-    // ReSharper disable once InconsistentNaming — Field must be protected for expression tree access in subclasses
-#pragma warning disable SA1401, CA1051, IDE1006
-    protected TenantId _tenantId;
-#pragma warning restore SA1401, CA1051, IDE1006
+    private TenantId _tenantId;
 
     protected TenantAwareDbContext(DbContextOptions<TContext> options) : base(options)
     {

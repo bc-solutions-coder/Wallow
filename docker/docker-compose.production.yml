@@ -238,6 +238,44 @@ services:
         max-file: "3"
 
   # ============================================
+  # WALLOW SEEDER
+  # ============================================
+  wallow-seeder:
+    image: ghcr.io/bc-solutions-coder/wallow-seeder:${VERSION:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-wallow}-seeder
+    restart: on-failure
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      # Admin bootstrap (override seed.json defaults for production)
+      Admin__Email: ${ADMIN_EMAIL}
+      Admin__Password: ${ADMIN_PASSWORD}
+      Admin__FirstName: ${ADMIN_FIRST_NAME:-Admin}
+      Admin__LastName: ${ADMIN_LAST_NAME:-User}
+      # OIDC client: Wallow Web (override seed.json defaults for production URLs)
+      Clients__0__ClientId: ${OIDC_CLIENT_ID}
+      Clients__0__DisplayName: Wallow Web
+      Clients__0__Secret: ${OIDC_CLIENT_SECRET}
+      Clients__0__TenantName: Default
+      Clients__0__RedirectUris__0: ${WEB_PUBLIC_URL:-https://wallow.dev}/signin-oidc
+      Clients__0__PostLogoutRedirectUris__0: ${WEB_PUBLIC_URL:-https://wallow.dev}/signout-callback-oidc
+      Clients__0__Scopes__0: openid
+      Clients__0__Scopes__1: email
+      Clients__0__Scopes__2: profile
+      Clients__0__Scopes__3: roles
+      Clients__0__Scopes__4: offline_access
+      Clients__0__SeedMembers__0: ${ADMIN_EMAIL}
+    depends_on:
+      wallow-migrations:
+        condition: service_completed_successfully
+    networks:
+      - wallow
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================
   # WALLOW API — CERT VOLUME INIT
   # ============================================
   # Named volumes are created owned by root; the API container runs as non-root
@@ -313,71 +351,10 @@ services:
       OTEL_SERVICE_NAME: wallow-api
       # Identity / JWT
       Identity__SigningKey: ${IDENTITY_SIGNING_KEY}
-      # Admin bootstrap (applied on first startup, no-op after)
-      AdminBootstrap__Email: ${ADMIN_EMAIL}
-      AdminBootstrap__Password: ${ADMIN_PASSWORD}
-      AdminBootstrap__FirstName: ${ADMIN_FIRST_NAME:-Admin}
-      AdminBootstrap__LastName: ${ADMIN_LAST_NAME:-User}
-      # Pre-registered OIDC clients
-      PreRegisteredClients__Clients__0__ClientId: ${OIDC_CLIENT_ID}
-      PreRegisteredClients__Clients__0__DisplayName: Wallow Web
-      PreRegisteredClients__Clients__0__Secret: ${OIDC_CLIENT_SECRET}
-      PreRegisteredClients__Clients__0__TenantName: Default
-      PreRegisteredClients__Clients__0__RedirectUris__0: ${WEB_PUBLIC_URL:-https://wallow.dev}/signin-oidc
-      PreRegisteredClients__Clients__0__PostLogoutRedirectUris__0: ${WEB_PUBLIC_URL:-https://wallow.dev}/signout-callback-oidc
-      PreRegisteredClients__Clients__0__Scopes__0: openid
-      PreRegisteredClients__Clients__0__Scopes__1: email
-      PreRegisteredClients__Clients__0__Scopes__2: profile
-      PreRegisteredClients__Clients__0__Scopes__3: roles
-      PreRegisteredClients__Clients__0__Scopes__4: offline_access
-      PreRegisteredClients__Clients__0__SeedMembers__0: ${ADMIN_EMAIL}
-      # Pre-registered OIDC client: bcordes.dev
-      PreRegisteredClients__Clients__1__ClientId: ${BCORDES_CLIENT_ID:-bcordes-client}
-      PreRegisteredClients__Clients__1__DisplayName: Bcordes.dev
-      PreRegisteredClients__Clients__1__Secret: ${BCORDES_CLIENT_SECRET}
-      PreRegisteredClients__Clients__1__TenantName: ${BCORDES_TENANT_NAME:-Bcordes}
-      PreRegisteredClients__Clients__1__SeedMembers__0: ${BCORDES_ADMIN_EMAIL:-bryan.cordes@bcordes.dev}
-      PreRegisteredClients__Clients__1__RedirectUris__0: ${BCORDES_PUBLIC_URL:-https://bcordes.dev}/auth/callback
-      PreRegisteredClients__Clients__1__PostLogoutRedirectUris__0: ${BCORDES_PUBLIC_URL:-https://bcordes.dev}/
-      PreRegisteredClients__Clients__1__Scopes__0: openid
-      PreRegisteredClients__Clients__1__Scopes__1: email
-      PreRegisteredClients__Clients__1__Scopes__2: profile
-      PreRegisteredClients__Clients__1__Scopes__3: roles
-      PreRegisteredClients__Clients__1__Scopes__4: offline_access
-      PreRegisteredClients__Clients__1__Scopes__5: users.read
-      PreRegisteredClients__Clients__1__Scopes__6: users.write
-      PreRegisteredClients__Clients__1__Scopes__7: users.manage
-      PreRegisteredClients__Clients__1__Scopes__8: organizations.read
-      PreRegisteredClients__Clients__1__Scopes__9: organizations.write
-      PreRegisteredClients__Clients__1__Scopes__10: organizations.manage
-      PreRegisteredClients__Clients__1__Scopes__11: storage.read
-      PreRegisteredClients__Clients__1__Scopes__12: storage.write
-      PreRegisteredClients__Clients__1__Scopes__13: notifications.read
-      PreRegisteredClients__Clients__1__Scopes__14: notifications.write
-      PreRegisteredClients__Clients__1__Scopes__15: roles.read
-      PreRegisteredClients__Clients__1__Scopes__16: roles.write
-      PreRegisteredClients__Clients__1__Scopes__17: roles.manage
-      PreRegisteredClients__Clients__1__Scopes__18: apikeys.read
-      PreRegisteredClients__Clients__1__Scopes__19: apikeys.write
-      PreRegisteredClients__Clients__1__Scopes__20: apikeys.manage
-      PreRegisteredClients__Clients__1__Scopes__21: sso.read
-      PreRegisteredClients__Clients__1__Scopes__22: sso.manage
-      PreRegisteredClients__Clients__1__Scopes__23: scim.manage
-      PreRegisteredClients__Clients__1__Scopes__24: announcements.read
-      PreRegisteredClients__Clients__1__Scopes__25: announcements.manage
-      PreRegisteredClients__Clients__1__Scopes__26: changelog.manage
-      PreRegisteredClients__Clients__1__Scopes__27: configuration.read
-      PreRegisteredClients__Clients__1__Scopes__28: configuration.manage
-      PreRegisteredClients__Clients__1__Scopes__29: inquiries.read
-      PreRegisteredClients__Clients__1__Scopes__30: inquiries.write
-      PreRegisteredClients__Clients__1__Scopes__31: serviceaccounts.read
-      PreRegisteredClients__Clients__1__Scopes__32: serviceaccounts.write
-      PreRegisteredClients__Clients__1__Scopes__33: serviceaccounts.manage
-      PreRegisteredClients__Clients__1__Scopes__34: webhooks.manage
     depends_on:
       api-cert-init:
         condition: service_completed_successfully
-      wallow-migrations:
+      wallow-seeder:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy

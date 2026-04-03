@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Wallow.Auth\Wallow.Auth.csproj" />
     <ProjectReference Include="..\Wallow.Web\Wallow.Web.csproj" />
     <ProjectReference Include="..\Wallow.MigrationService\Wallow.MigrationService.csproj" />
+    <ProjectReference Include="..\Wallow.SeederService\Wallow.SeederService.csproj" />
   </ItemGroup>
 
 </Project>

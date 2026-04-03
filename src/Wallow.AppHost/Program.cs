@@ -34,12 +34,17 @@ IResourceBuilder<ProjectResource> migrations = builder.AddProject<Projects.Wallo
     .WithReference(postgres, connectionName: "DefaultConnection")
     .WaitFor(postgres);
 
+// Seeder runs after migrations, seeds roles/scopes/admin/clients from seed.json, then exits
+IResourceBuilder<ProjectResource> seeder = builder.AddProject<Projects.Wallow_SeederService>("wallow-seeder")
+    .WithReference(postgres, connectionName: "DefaultConnection")
+    .WaitForCompletion(migrations);
+
 // API waits for all infrastructure + migrations
 IResourceBuilder<ProjectResource> api = builder.AddProject<Projects.Wallow_Api>("wallow-api")
     .WithReference(postgres, connectionName: "DefaultConnection")
     .WithReference(valkey, connectionName: "Redis")
     .WithEnvironment("Storage__S3__Endpoint", garage.GetEndpoint("s3"))
-    .WaitForCompletion(migrations)
+    .WaitForCompletion(seeder)
     .WaitFor(valkey)
     .WaitFor(garage);
 

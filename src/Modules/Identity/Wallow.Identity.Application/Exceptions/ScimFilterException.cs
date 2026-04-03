@@ -1,5 +1,3 @@
-#pragma warning disable CA1032 // Intentionally restricting constructors to enforce structured exception creation
-
 namespace Wallow.Identity.Application.Exceptions;
 
 public sealed class ScimFilterException : Exception

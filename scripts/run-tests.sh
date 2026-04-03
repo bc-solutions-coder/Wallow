@@ -50,9 +50,10 @@ CMD=(dotnet test --settings "$RUNSETTINGS" --logger "trx;LogFilePrefix=results" 
 if [[ -n "$PROJECT_PATH" ]]; then
     CMD+=("$PROJECT_PATH")
 fi
-# Exclude E2E tests from standard runs; only include when explicitly requested via the e2e shorthand
-if [[ -z "$MODULE_FILTER" ]]; then
-    CMD+=(--filter "Category!=E2E")
+# Exclude E2E and Integration tests from standard runs; they require live infrastructure.
+# E2E tests must use ./scripts/run-e2e.sh; integration tests need Docker services running.
+if [[ "$MODULE_FILTER" != "e2e" && "$MODULE_FILTER" != "integration" ]]; then
+    CMD+=(--filter "Category!=E2E&Category!=Integration")
 fi
 
 echo "=== WALLOW TEST RUN ==="

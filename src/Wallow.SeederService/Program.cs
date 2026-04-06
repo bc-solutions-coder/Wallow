@@ -26,6 +26,11 @@ string seedDir = Path.GetDirectoryName(seedFilePath) ?? AppContext.BaseDirectory
 string seedEnvPath = Path.Combine(seedDir, $"seed.{builder.Environment.EnvironmentName}.json");
 builder.Configuration.AddJsonFile(seedEnvPath, optional: true, reloadOnChange: false);
 
+// Re-add environment variables so they take precedence over seed.json values.
+// Host.CreateApplicationBuilder adds env vars early, but seed.json (added above) overrides them.
+// This ensures Docker/CI overrides like Clients__1__RedirectUris__0 are applied.
+builder.Configuration.AddEnvironmentVariables();
+
 // Bind SeedOptions from config root
 builder.Services.Configure<SeedOptions>(builder.Configuration);
 

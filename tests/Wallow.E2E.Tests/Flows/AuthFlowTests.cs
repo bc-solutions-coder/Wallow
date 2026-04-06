@@ -139,12 +139,17 @@ public sealed class AuthFlowTests : E2ETestBase
     [Trait("E2EGroup", "Auth")]
     public async Task AuthRedirectFlow_ProtectedRouteRedirectsToLoginThenReturns()
     {
-        // Try to access a protected route without authentication
-        DashboardPage dashboardPage = new(Page, Docker.WebBaseUrl);
-        await dashboardPage.NavigateAsync();
+        // Try to access a protected route without authentication.
+        // Don't use DashboardPage.NavigateAsync() here — it waits for NetworkIdle which
+        // can hang during the multi-hop OIDC redirect chain in containerized environments.
+        await Page.GotoAsync($"{Docker.WebBaseUrl}/dashboard/apps",
+            new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
-        // Should be redirected to login
-        await Page.WaitForURLAsync(url => url.Contains("/login") || url.Contains("/authentication/login"));
+        // Should be redirected to login via SSR redirect → OIDC challenge → Auth login page
+        await Page.WaitForURLAsync(
+            url => url.Contains("/login", StringComparison.OrdinalIgnoreCase),
+            new PageWaitForURLOptions { Timeout = 30_000 });
+
         string currentUrl = Page.Url;
         Assert.Contains("login", currentUrl, StringComparison.OrdinalIgnoreCase);
     }
@@ -253,10 +258,14 @@ public sealed class AuthFlowTests : E2ETestBase
     {
         TestUser user = await TestUserFactory.CreateAsync(Docker.ApiBaseUrl, Docker.MailpitBaseUrl);
 
-        // Log in via the OIDC flow to reach the dashboard
+        // Log in via the OIDC flow to reach the dashboard.
+        // Wait for the URL to settle on the Auth login page before looking for elements,
+        // as the OIDC redirect chain can be slow under container resource contention.
         await Page.GotoAsync($"{Docker.WebBaseUrl}/authentication/login");
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await Page.GetByTestId("login-email").WaitForAsync(new() { Timeout = 15_000 });
+        await Page.WaitForURLAsync(
+            url => url.Contains("/login", StringComparison.OrdinalIgnoreCase),
+            new PageWaitForURLOptions { Timeout = 30_000 });
+        await Page.GetByTestId("login-email").WaitForAsync(new() { Timeout = 30_000 });
 
         LoginPage loginPage = new(Page, Docker.AuthBaseUrl);
         await loginPage.FillEmailAsync(user.Email);
@@ -277,7 +286,8 @@ public sealed class AuthFlowTests : E2ETestBase
             new PageWaitForURLOptions { Timeout = 30_000 });
 
         // Now try to access the dashboard directly — should redirect to login
-        await Page.GotoAsync($"{Docker.WebBaseUrl}/dashboard/apps");
+        await Page.GotoAsync($"{Docker.WebBaseUrl}/dashboard/apps",
+            new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
         await Page.WaitForURLAsync(
             url => url.Contains("/login", StringComparison.OrdinalIgnoreCase),
             new PageWaitForURLOptions { Timeout = 30_000 });

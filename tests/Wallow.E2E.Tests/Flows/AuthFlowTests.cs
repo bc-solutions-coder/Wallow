@@ -258,14 +258,10 @@ public sealed class AuthFlowTests : E2ETestBase
     {
         TestUser user = await TestUserFactory.CreateAsync(Docker.ApiBaseUrl, Docker.MailpitBaseUrl);
 
-        // Log in via the OIDC flow to reach the dashboard.
-        // Wait for the URL to settle on the Auth login page before looking for elements,
-        // as the OIDC redirect chain can be slow under container resource contention.
+        // Log in via the OIDC flow to reach the dashboard
         await Page.GotoAsync($"{Docker.WebBaseUrl}/authentication/login");
-        await Page.WaitForURLAsync(
-            url => url.Contains("/login", StringComparison.OrdinalIgnoreCase),
-            new PageWaitForURLOptions { Timeout = 30_000 });
-        await Page.GetByTestId("login-email").WaitForAsync(new() { Timeout = 30_000 });
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Page.GetByTestId("login-email").WaitForAsync(new() { Timeout = 15_000 });
 
         LoginPage loginPage = new(Page, Docker.AuthBaseUrl);
         await loginPage.FillEmailAsync(user.Email);
